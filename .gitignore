@@ -1,0 +1,10 @@
+.datasetCreation/cropped
+.datasetCreation/images
+.datasetCreation/jsons
+.datasetCreation/labels
+datasetCreation/cropped
+datasetCreation/images
+datasetCreation/jsons
+datasetCreation/labels
+.venv
+venv
