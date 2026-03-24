@@ -8,7 +8,7 @@ import numpy as np
 import torch
 import torch.nn as nn
 from PIL import Image
-from sklearn.metrics import accuracy_score, classification_report, confusion_matrix, f1_score, roc_auc_score
+from sklearn.metrics import accuracy_score, f1_score, roc_auc_score
 from sklearn.model_selection import train_test_split
 from torch.utils.data import DataLoader, Dataset
 from torchvision import transforms
@@ -92,20 +92,15 @@ def build_transforms():
 
 
 def collect_samples(dataset_root: Path):
-    image_paths = []
-    labels = []
-    for label_index, class_name in enumerate(CLASS_NAMES):
-        class_dir = dataset_root / class_name
-        if not class_dir.exists():
-            raise FileNotFoundError(f"Class directory not found: {class_dir}")
-        for image_path in sorted(class_dir.glob("*.jpg")):
-            image_paths.append(image_path)
-            labels.append(label_index)
-
-    if not image_paths:
+    samples = [
+        (image_path, label_index)
+        for label_index, class_name in enumerate(CLASS_NAMES)
+        for image_path in sorted((dataset_root / class_name).glob("*.jpg"))
+    ]
+    if not samples:
         raise RuntimeError(f"No .jpg files found in {dataset_root}")
-
-    return image_paths, labels
+    image_paths, labels = zip(*samples)
+    return list(image_paths), list(labels)
 
 
 def split_samples(image_paths, labels, seed: int):
@@ -132,18 +127,15 @@ def split_samples(image_paths, labels, seed: int):
 
 def create_dataloaders(splits, batch_size: int, num_workers: int):
     train_transform, eval_transform = build_transforms()
-    train_paths, train_labels = splits["train"]
-    val_paths, val_labels = splits["val"]
-    test_paths, test_labels = splits["test"]
-
-    train_ds = CropDataset(train_paths, train_labels, train_transform)
-    val_ds = CropDataset(val_paths, val_labels, eval_transform)
-    test_ds = CropDataset(test_paths, test_labels, eval_transform)
-
     return {
-        "train": DataLoader(train_ds, batch_size=batch_size, shuffle=True, num_workers=num_workers, pin_memory=True),
-        "val": DataLoader(val_ds, batch_size=batch_size, shuffle=False, num_workers=num_workers, pin_memory=True),
-        "test": DataLoader(test_ds, batch_size=batch_size, shuffle=False, num_workers=num_workers, pin_memory=True),
+        split_name: DataLoader(
+            CropDataset(paths, labels, train_transform if split_name == "train" else eval_transform),
+            batch_size=batch_size,
+            shuffle=split_name == "train",
+            num_workers=num_workers,
+            pin_memory=True,
+        )
+        for split_name, (paths, labels) in splits.items()
     }
 
 
@@ -174,22 +166,8 @@ def evaluate(model, dataloader, criterion, device):
         "loss": average_loss,
         "accuracy": accuracy_score(all_labels, all_preds),
         "macro_f1": f1_score(all_labels, all_preds, average="macro", zero_division=0),
-        "confusion_matrix": confusion_matrix(all_labels, all_preds).tolist(),
-        "classification_report": classification_report(
-            all_labels,
-            all_preds,
-            target_names=CLASS_NAMES,
-            digits=4,
-            zero_division=0,
-            output_dict=True,
-        ),
+        "roc_auc": roc_auc_score(all_labels, all_probs) if len(set(all_labels)) > 1 else None,
     }
-
-    if len(set(all_labels)) > 1:
-        metrics["roc_auc"] = roc_auc_score(all_labels, all_probs)
-    else:
-        metrics["roc_auc"] = None
-
     return metrics
 
 
@@ -204,7 +182,6 @@ def train_model(model_name, dataloaders, args, device):
     best_metrics = None
     best_epoch = -1
     stale_epochs = 0
-    history = []
 
     for epoch in range(1, args.epochs + 1):
         model.train()
@@ -237,18 +214,6 @@ def train_model(model_name, dataloaders, args, device):
         val_metrics = evaluate(model, dataloaders["val"], criterion, device)
         scheduler.step(val_metrics["loss"])
 
-        epoch_metrics = {
-            "epoch": epoch,
-            "train": train_metrics,
-            "val": {
-                "loss": val_metrics["loss"],
-                "accuracy": val_metrics["accuracy"],
-                "macro_f1": val_metrics["macro_f1"],
-                "roc_auc": val_metrics["roc_auc"],
-            },
-        }
-        history.append(epoch_metrics)
-
         is_better = (
             best_metrics is None
             or val_metrics["macro_f1"] > best_metrics["macro_f1"]
@@ -274,27 +239,17 @@ def train_model(model_name, dataloaders, args, device):
             if stale_epochs >= args.early_stop_patience:
                 break
 
-    if best_state is None:
-        raise RuntimeError(f"Training failed to produce a checkpoint for {model_name}")
-
     model.load_state_dict(best_state)
-    test_metrics = evaluate(model, dataloaders["test"], criterion, device)
-
     return {
         "model_name": model_name,
         "best_epoch": best_epoch,
-        "history": history,
         "best_val": best_metrics,
-        "test": test_metrics,
+        "test": evaluate(model, dataloaders["test"], criterion, device),
         "state_dict": best_state,
     }
 
 
-def save_result(result, output_dir: Path, splits, seed: int):
-    output_dir.mkdir(parents=True, exist_ok=True)
-    checkpoint_path = output_dir / f"best_{result['model_name']}_kgo.pth"
-    metrics_path = output_dir / f"metrics_{result['model_name']}.json"
-
+def save_result(result, output_dir: Path, split_sizes, seed: int):
     torch.save(
         {
             "model_name": result["model_name"],
@@ -302,24 +257,29 @@ def save_result(result, output_dir: Path, splits, seed: int):
             "input_size": MODEL_INPUT_SIZE,
             "state_dict": result["state_dict"],
         },
-        checkpoint_path,
+        output_dir / f"best_{result['model_name']}_kgo.pth",
     )
 
-    payload = {
-        "model_name": result["model_name"],
-        "best_epoch": result["best_epoch"],
-        "best_val": result["best_val"],
-        "test": result["test"],
-        "split_sizes": {split_name: len(split_data[0]) for split_name, split_data in splits.items()},
-        "seed": seed,
-    }
-    metrics_path.write_text(json.dumps(payload, ensure_ascii=False, indent=2), encoding="utf-8")
+    (output_dir / f"metrics_{result['model_name']}.json").write_text(
+        json.dumps(
+            {
+                "model_name": result["model_name"],
+                "best_epoch": result["best_epoch"],
+                "best_val": result["best_val"],
+                "test": result["test"],
+                "split_sizes": split_sizes,
+                "seed": seed,
+            },
+            ensure_ascii=False,
+            indent=2,
+        ),
+        encoding="utf-8",
+    )
 
 
 def save_leaderboard(results, output_dir: Path):
-    leaderboard = []
-    for result in results:
-        leaderboard.append(
+    leaderboard = sorted(
+        (
             {
                 "model_name": result["model_name"],
                 "best_epoch": result["best_epoch"],
@@ -329,9 +289,10 @@ def save_leaderboard(results, output_dir: Path):
                 "test_accuracy": result["test"]["accuracy"],
                 "test_roc_auc": result["test"]["roc_auc"],
             }
-        )
-
-    leaderboard.sort(key=lambda item: (-item["val_macro_f1"], item["val_loss"]))
+            for result in results
+        ),
+        key=lambda item: (-item["val_macro_f1"], item["val_loss"]),
+    )
     (output_dir / "leaderboard.json").write_text(
         json.dumps(leaderboard, ensure_ascii=False, indent=2),
         encoding="utf-8",
@@ -355,19 +316,17 @@ def main():
 
     image_paths, labels = collect_samples(dataset_root)
     splits = split_samples(image_paths, labels, seed=args.seed)
+    split_sizes = {split_name: len(paths) for split_name, (paths, _) in splits.items()}
     dataloaders = create_dataloaders(splits, batch_size=args.batch_size, num_workers=args.num_workers)
-
-    print(
-        "Split sizes:",
-        {split_name: len(split_data[0]) for split_name, split_data in splits.items()},
-    )
+    output_dir.mkdir(parents=True, exist_ok=True)
+    print("Split sizes:", split_sizes)
 
     results = []
     for model_name in args.models:
         started_at = time.time()
         result = train_model(model_name, dataloaders, args, device)
         result["elapsed_seconds"] = round(time.time() - started_at, 2)
-        save_result(result, output_dir, splits, args.seed)
+        save_result(result, output_dir, split_sizes, args.seed)
         results.append(result)
         print(
             f"[{model_name}] done in {result['elapsed_seconds']}s "
