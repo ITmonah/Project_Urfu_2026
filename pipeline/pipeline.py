@@ -1,11 +1,15 @@
+import os
 import torch
-import torch.nn as nn
-from torchvision import models, transforms
 from ultralytics import YOLO
 from PIL import Image
 import base64
 import io
 from pathlib import Path
+
+try:
+    from .classifier_models import build_inference_transform, load_classifier_checkpoint
+except ImportError:
+    from classifier_models import build_inference_transform, load_classifier_checkpoint
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
@@ -13,22 +17,19 @@ DEBUG_IMAGE_PATH = ""
 USE_DEBUG_IMAGE = False
 
 current_dir = Path(__file__).parent
-yolo_model = YOLO(str(current_dir / "yolo_source.pt"))
+yolo_checkpoint_path = Path(os.getenv("KGO_YOLO_CHECKPOINT", current_dir / "yolo_source.pt"))
+classifier_checkpoint_path = Path(os.getenv("KGO_CLASSIFIER_CHECKPOINT", current_dir / "best_resnet_kgo.pth"))
 
-resnet_model = models.resnet50()
-num_features = resnet_model.fc.in_features
-resnet_model.fc = nn.Linear(num_features, 2)
-resnet_model.load_state_dict(torch.load(str(current_dir / "best_resnet_kgo.pth"), map_location=device))
-resnet_model = resnet_model.to(device)
-resnet_model.eval()
+if not yolo_checkpoint_path.exists():
+    raise FileNotFoundError(f"YOLO checkpoint not found: {yolo_checkpoint_path}")
+if not classifier_checkpoint_path.exists():
+    raise FileNotFoundError(f"Classifier checkpoint not found: {classifier_checkpoint_path}")
 
-transform = transforms.Compose([
-    transforms.Resize((224, 224)),
-    transforms.ToTensor(),
-    transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])
-])
-
-class_names = ['kgo_empty', 'kgo_full']
+yolo_model = YOLO(str(yolo_checkpoint_path))
+classifier_model, classifier_name, class_names = load_classifier_checkpoint(classifier_checkpoint_path, device)
+classifier_model = classifier_model.to(device)
+classifier_model.eval()
+transform = build_inference_transform()
 
 def process_images(images):
     if USE_DEBUG_IMAGE:
@@ -62,10 +63,11 @@ def process_images(images):
         for crop in detections:
             input_tensor = transform(crop).unsqueeze(0).to(device)
             with torch.no_grad():
-                output = resnet_model(input_tensor)
+                output = classifier_model(input_tensor)
                 pred = torch.argmax(output, dim=1).item()
                 img_results.append(class_names[pred])
         results.append(img_results)
     if USE_DEBUG_IMAGE:
+        print(f"Classifier: {classifier_name}")
         print(results)
     return results

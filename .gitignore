@@ -3,9 +3,12 @@
 .datasetCreation/jsons
 .datasetCreation/labels
 datasetCreation/cropped
+datasetCreation/cropped_datumaro
 datasetCreation/images
 datasetCreation/jsons
 datasetCreation/labels
+datasets/
+artifacts
 .venv
 venv
 *.pth
@@ -15,3 +18,6 @@ venv
 
 *__pycache__/
 *.log
+.vscode
+.tmp
+.deps
