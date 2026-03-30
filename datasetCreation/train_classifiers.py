@@ -1,6 +1,8 @@
 import argparse
 import json
 import random
+import shutil
+import tempfile
 import time
 from pathlib import Path
 
@@ -12,6 +14,7 @@ from sklearn.metrics import accuracy_score, f1_score, roc_auc_score
 from sklearn.model_selection import train_test_split
 from torch.utils.data import DataLoader, Dataset
 from torchvision import transforms
+from ultralytics import YOLO
 
 from pipeline.classifier_models import (
     CLASS_NAMES,
@@ -125,6 +128,68 @@ def split_samples(image_paths, labels, seed: int):
     }
 
 
+def prepare_yolo_dataset(splits, temp_root: Path):
+    for split_name in ("train", "val", "test"):
+        for image_path, label in zip(*splits[split_name]):
+            dest_dir = temp_root / split_name / CLASS_NAMES[label]
+            dest_dir.mkdir(parents=True, exist_ok=True)
+            shutil.copy2(image_path, dest_dir / image_path.name)
+
+
+def build_yolo_data_yaml(temp_root: Path):
+    yaml_lines = [
+        f"path: {temp_root}",
+        "train: train",
+        "val: val",
+        "test: test",
+        "names:",
+    ]
+    yaml_lines.extend(f"  {idx}: {name}" for idx, name in enumerate(CLASS_NAMES))
+    data_yaml_path = temp_root / "dataset.yaml"
+    data_yaml_path.write_text("\n".join(yaml_lines), encoding="utf-8")
+    return data_yaml_path
+
+
+def train_yolo_classifier(splits, args, device):
+    if args.no_pretrained:
+        print("[yolo] Warning: YOLO classification uses yolov8n-cls.pt pretrained weights by default.")
+
+    with tempfile.TemporaryDirectory() as tmpdir:
+        temp_root = Path(tmpdir)
+        prepare_yolo_dataset(splits, temp_root)
+        data_yaml_path = build_yolo_data_yaml(temp_root)
+
+        yolo_model = YOLO("yolov8n-cls.pt")
+        yolo_model.train(
+            data=str(data_yaml_path),
+            epochs=args.epochs,
+            batch=args.batch_size,
+            imgsz=MODEL_INPUT_SIZE,
+            workers=args.num_workers,
+            lr0=args.learning_rate,
+            device=str(device),
+            project=str(temp_root),
+            name="yolo_classifier",
+            exist_ok=True,
+        )
+
+        weights_dir = temp_root / "yolo_classifier" / "weights"
+        best_weights = weights_dir / "best.pt"
+        if not best_weights.exists():
+            best_weights = weights_dir / "last.pt"
+
+        trained_model = YOLO(str(best_weights))
+        state_dict = trained_model.model.state_dict()
+
+    return {
+        "model_name": "yolo",
+        "best_epoch": args.epochs,
+        "best_val": {"loss": float("inf"), "macro_f1": 0.0},
+        "test": {"loss": None, "accuracy": None, "macro_f1": None, "roc_auc": None},
+        "state_dict": state_dict,
+    }
+
+
 def create_dataloaders(splits, batch_size: int, num_workers: int):
     train_transform, eval_transform = build_transforms()
     return {
@@ -171,7 +236,10 @@ def evaluate(model, dataloader, criterion, device):
     return metrics
 
 
-def train_model(model_name, dataloaders, args, device):
+def train_model(model_name, dataloaders, args, device, splits):
+    if model_name == "yolo":
+        return train_yolo_classifier(splits, args, device)
+
     model = create_classifier(model_name, num_classes=len(CLASS_NAMES), pretrained=not args.no_pretrained).to(device)
     criterion = nn.CrossEntropyLoss()
     optimizer = torch.optim.AdamW(model.parameters(), lr=args.learning_rate, weight_decay=args.weight_decay)
@@ -324,7 +392,7 @@ def main():
     results = []
     for model_name in args.models:
         started_at = time.time()
-        result = train_model(model_name, dataloaders, args, device)
+        result = train_model(model_name, dataloaders, args, device, splits)
         result["elapsed_seconds"] = round(time.time() - started_at, 2)
         save_result(result, output_dir, split_sizes, args.seed)
         results.append(result)

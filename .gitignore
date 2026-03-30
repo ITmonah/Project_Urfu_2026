@@ -21,3 +21,5 @@ venv
 .vscode
 .tmp
 .deps
+*.txt
+.txt
