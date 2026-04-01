@@ -68,7 +68,7 @@ async def run_from_form(request: Request, image: UploadFile = File(...), model: 
             request,
             result=result,
             selected_model=model,
-            image_preview=image_preview,
+            image_preview=result["annotated_image"],
         )
     except (FileNotFoundError, ValueError) as exc:
         return render_index(

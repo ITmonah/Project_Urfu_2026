@@ -6,7 +6,7 @@ from pathlib import Path
 from typing import Any
 
 import torch
-from PIL import Image
+from PIL import Image, ImageDraw, ImageFont
 from ultralytics import YOLO
 
 from pipeline.classifier_models import (
@@ -80,14 +80,63 @@ def load_classifier(classifier_checkpoint: str):
 
 
 def is_target_detection(result, detector: YOLO, cls_id: int) -> bool:
-    class_names = getattr(result, "names", None) or getattr(detector, "names", {})
-    class_name = class_names.get(cls_id) if isinstance(class_names, dict) else class_names[cls_id]
+    class_name = get_detection_class_name(result, detector, cls_id)
     return class_name == TARGET_DETECTION_CLASS
+
+
+def get_detection_class_name(result, detector: YOLO, cls_id: int) -> str:
+    class_names = getattr(result, "names", None) or getattr(detector, "names", {})
+    if isinstance(class_names, dict):
+        return class_names.get(cls_id, str(cls_id))
+    return class_names[cls_id]
 
 
 def image_to_data_url(image_bytes: bytes, content_type: str) -> str:
     encoded = base64.b64encode(image_bytes).decode("utf-8")
     return f"data:{content_type};base64,{encoded}"
+
+
+def pil_image_to_data_url(image: Image.Image, image_format: str = "PNG") -> str:
+    buffer = BytesIO()
+    image.save(buffer, format=image_format)
+    return image_to_data_url(buffer.getvalue(), "image/png")
+
+
+def draw_detection_overlays(image: Image.Image, detections: list[dict[str, Any]]) -> Image.Image:
+    annotated = image.copy()
+    draw = ImageDraw.Draw(annotated)
+    font = ImageFont.load_default()
+    line_width = max(2, round(min(annotated.size) * 0.005))
+    text_padding = 4
+
+    for detection in detections:
+        x1, y1, x2, y2 = detection["bbox"]
+        label = detection["annotation"]
+        color = detection["color"]
+
+        draw.rectangle((x1, y1, x2, y2), outline=color, width=line_width)
+
+        text_bbox = draw.textbbox((0, 0), label, font=font)
+        text_width = text_bbox[2] - text_bbox[0]
+        text_height = text_bbox[3] - text_bbox[1]
+
+        text_x = max(0, x1)
+        text_y = y1 - text_height - (text_padding * 2)
+        if text_y < 0:
+            text_y = min(annotated.height - text_height - (text_padding * 2), y1 + line_width)
+
+        draw.rectangle(
+            (
+                text_x,
+                text_y,
+                text_x + text_width + (text_padding * 2),
+                text_y + text_height + (text_padding * 2),
+            ),
+            fill=color,
+        )
+        draw.text((text_x + text_padding, text_y + text_padding), label, fill="white", font=font)
+
+    return annotated
 
 
 def run_inference(image_bytes: bytes, model_name: str) -> dict[str, Any]:
@@ -101,13 +150,30 @@ def run_inference(image_bytes: bytes, model_name: str) -> dict[str, Any]:
     yolo_results = detector(image)
 
     predictions: list[dict[str, Any]] = []
+    detections: list[dict[str, Any]] = []
     for result in yolo_results:
-        for box in result.boxes:
+        boxes = getattr(result, "boxes", None)
+        if boxes is None:
+            continue
+
+        for box in boxes:
             cls_id = int(box.cls)
+            class_name = get_detection_class_name(result, detector, cls_id)
+            x1, y1, x2, y2 = [float(value) for value in box.xyxy[0].tolist()]
+            confidence = float(box.conf.item()) if box.conf is not None else None
+
+            detection: dict[str, Any] = {
+                "bbox": [x1, y1, x2, y2],
+                "annotation": class_name,
+                "color": "#f59e0b",
+            }
+
             if not is_target_detection(result, detector, cls_id):
+                if confidence is not None:
+                    detection["annotation"] = f"{class_name} {confidence:.2f}"
+                detections.append(detection)
                 continue
 
-            x1, y1, x2, y2 = box.xyxy[0].tolist()
             crop = image.crop((x1, y1, x2, y2))
             input_tensor = TRANSFORM(crop).unsqueeze(0).to(DEVICE)
 
@@ -115,12 +181,21 @@ def run_inference(image_bytes: bytes, model_name: str) -> dict[str, Any]:
                 output = classifier_model(input_tensor)
                 pred_idx = torch.argmax(output, dim=1).item()
 
+            predicted_label = class_names[pred_idx]
+            detection["annotation"] = predicted_label
+            detection["color"] = "#22c55e"
+            if confidence is not None:
+                detection["annotation"] = f"{predicted_label} {confidence:.2f}"
+            detections.append(detection)
+
             predictions.append(
                 {
-                    "label": class_names[pred_idx],
+                    "label": predicted_label,
                     "bbox": [round(x1, 2), round(y1, 2), round(x2, 2), round(y2, 2)],
                 }
             )
+
+    annotated_image = draw_detection_overlays(image, detections)
 
     return {
         "model": model_name,
@@ -128,4 +203,5 @@ def run_inference(image_bytes: bytes, model_name: str) -> dict[str, Any]:
         "classifier_checkpoint": str(classifier_checkpoint),
         "yolo_checkpoint": str(yolo_checkpoint),
         "predictions": predictions,
+        "annotated_image": pil_image_to_data_url(annotated_image),
     }
