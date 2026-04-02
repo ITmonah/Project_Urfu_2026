@@ -137,53 +137,22 @@ def build_metrics(y_true, y_pred, class_names):
 
 
 def write_report(overall_stats):
-    lines = [
-        "Pipeline debug report",
-        "====================",
-        "",
-        "Summary metrics for each classifier:",
-        "",
-        f"{'classifier':<30} {'accuracy':>10} {'macro_f1':>10} {'precision':>10} {'recall':>10} {'wrong':>8} {'no_det':>8} {'total':>8}",
-        f"{'-'*30} {'-'*10} {'-'*10} {'-'*10} {'-'*10} {'-'*8} {'-'*8} {'-'*8}",
-    ]
-
-    for classifier_name, stats in overall_stats.items():
-        lines.append(
-            f"{classifier_name:<30} "
-            f"{stats['accuracy']*100:9.2f}% "
-            f"{stats['macro_f1']*100:9.2f}% "
-            f"{stats['macro_precision']*100:9.2f}% "
-            f"{stats['macro_recall']*100:9.2f}% "
-            f"{stats['wrong_count']:8d} "
-            f"{stats['no_detection_count']:8d} "
-            f"{stats['total_count']:8d}"
-        )
+    lines = []
 
     for classifier_name, stats in overall_stats.items():
         lines.extend([
-            "",
-            f"Classifier: {classifier_name}",
-            "-" * (12 + len(classifier_name)),
+            f"## Classifier: {classifier_name}",
+            "--------------------------------------",
             f"Total images: {stats['total_count']}",
             f"Wrong predictions: {stats['wrong_count']}",
-            f"No detection / crop failure: {stats['no_detection_count']}",
             f"Overall accuracy: {stats['accuracy']*100:.2f}%",
             f"Macro F1: {stats['macro_f1']*100:.2f}%",
             f"Macro precision: {stats['macro_precision']*100:.2f}%",
             f"Macro recall: {stats['macro_recall']*100:.2f}%",
             "",
-            "Classification report:",
-            stats["report_text"],
-            "",
-            "Confusion matrix:",
         ])
-        labels_header = "      " + " ".join(f"{name:>10}" for name in CLASS_NAMES)
-        lines.append(labels_header)
-        for label, row in zip(CLASS_NAMES, stats["confusion_matrix"]):
-            row_text = " ".join(f"{value:>10d}" for value in row)
-            lines.append(f"{label:>6} {row_text}")
 
-    report_path.write_text("\n".join(lines), encoding="utf-8")
+    report_path.write_text("\n".join(lines).rstrip() + "\n", encoding="utf-8")
     print(f"Report written to {report_path}")
 
 
