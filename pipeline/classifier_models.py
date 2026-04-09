@@ -9,12 +9,24 @@ CLASS_NAMES = ["kgo_empty", "kgo_full"]
 MODEL_INPUT_SIZE = 224
 IMAGENET_MEAN = [0.485, 0.456, 0.406]
 IMAGENET_STD = [0.229, 0.224, 0.225]
-SUPPORTED_MODELS = ("resnet50", "efficientnet_v2_s", "convnext_tiny")
+SUPPORTED_MODELS = ("resnet18", "resnet34", "resnet50", "efficientnet_v2_s", "convnext_tiny", "yolo")
 
 
 def create_classifier(model_name: str, num_classes: int = 2, pretrained: bool = False) -> nn.Module:
+    if model_name == "resnet18":
+        weights = models.ResNet18_Weights.IMAGENET1K_V1 if pretrained else None
+        model = models.resnet18(weights=weights)
+        model.fc = nn.Linear(model.fc.in_features, num_classes)
+        return model
+
+    if model_name == "resnet34":
+        weights = models.ResNet34_Weights.IMAGENET1K_V1 if pretrained else None
+        model = models.resnet34(weights=weights)
+        model.fc = nn.Linear(model.fc.in_features, num_classes) 
+        return model
+
     if model_name == "resnet50":
-        weights = models.ResNet50_Weights.IMAGENET1K_V2 if pretrained else None
+        weights = models.ResNet50_Weights.IMAGENET1K_V1 if pretrained else None
         model = models.resnet50(weights=weights)
         model.fc = nn.Linear(model.fc.in_features, num_classes)
         return model

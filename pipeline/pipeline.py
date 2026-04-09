@@ -15,6 +15,7 @@ device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
 DEBUG_IMAGE_PATH = ""
 USE_DEBUG_IMAGE = False
+TARGET_DETECTION_CLASS = os.getenv("KGO_YOLO_CLASS_NAME", "kgo_platform")
 
 current_dir = Path(__file__).parent
 yolo_checkpoint_path = Path(os.getenv("KGO_YOLO_CHECKPOINT", current_dir / "yolo_source.pt"))
@@ -30,6 +31,12 @@ classifier_model, classifier_name, class_names = load_classifier_checkpoint(clas
 classifier_model = classifier_model.to(device)
 classifier_model.eval()
 transform = build_inference_transform()
+
+
+def is_target_detection(result, cls_id):
+    class_names = getattr(result, "names", None) or getattr(yolo_model, "names", {})
+    class_name = class_names.get(cls_id) if isinstance(class_names, dict) else class_names[cls_id]
+    return class_name == TARGET_DETECTION_CLASS
 
 def process_images(images):
     if USE_DEBUG_IMAGE:
@@ -52,7 +59,7 @@ def process_images(images):
         for result in yolo_results:
             for box in result.boxes:
                 cls = int(box.cls)
-                if cls == 2:
+                if is_target_detection(result, cls):
                     x1, y1, x2, y2 = box.xyxy[0].tolist()
                     crop = img.crop((x1, y1, x2, y2))
                     detections.append(crop)
