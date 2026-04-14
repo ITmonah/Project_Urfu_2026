@@ -22,7 +22,7 @@ except ImportError:
 
 current_dir = Path(__file__).parent
 images_root = current_dir / "images"
-yolo_checkpoint_path = current_dir / "yolo_source.pt"
+yolo_checkpoint_path = current_dir / "best.pt"
 wrong_predictions_root = current_dir / "wrong_predictions"
 report_path = current_dir / "report.txt"
 
