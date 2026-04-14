@@ -28,4 +28,6 @@ venv
 .zip
 Yolo_dataset_ready
 report.txt
+report2.txt
 summary.json
+Yolo26sTest/
