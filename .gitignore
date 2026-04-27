@@ -7,6 +7,9 @@ datasetCreation/cropped_datumaro
 datasetCreation/images
 datasetCreation/jsons
 datasetCreation/labels
+datasetCreation/runs
+datasetCreation/temp_extract
+datasetCreation/YoloDatasetReady
 datasets/
 artifacts
 .venv
@@ -21,3 +24,10 @@ venv
 .vscode
 .tmp
 .deps
+*.zip
+.zip
+Yolo_dataset_ready
+report.txt
+report2.txt
+summary.json
+Yolo26sTest/
