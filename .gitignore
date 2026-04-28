@@ -18,6 +18,8 @@ venv
 *.jpg
 *.jpeg
 *.pt
+*.7z
+report3.txt
 
 *__pycache__/
 *.log

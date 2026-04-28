@@ -9,3 +9,4 @@ matplotlib
 seaborn
 scikit-learn
 ultralytics
+transformers==4.25.1
