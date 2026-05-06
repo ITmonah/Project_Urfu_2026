@@ -8,3 +8,5 @@ datasetCreation/jsons
 datasetCreation/labels
 .venv
 venv
+*.pth
+dataset
