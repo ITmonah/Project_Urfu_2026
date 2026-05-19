@@ -67,6 +67,66 @@ body {
     gap: 8px;
 }
 
+.pipeline-field {
+    border: 0;
+    margin: 0;
+    padding: 0;
+}
+
+.pipeline-field legend {
+    padding: 0;
+    font-weight: 400;
+}
+
+.pipeline-options {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 10px;
+}
+
+.pipeline-option {
+    position: relative;
+    display: grid;
+}
+
+.pipeline-option input {
+    position: absolute;
+    opacity: 0;
+    pointer-events: none;
+}
+
+.pipeline-option-content {
+    min-height: 112px;
+    display: grid;
+    align-content: start;
+    gap: 8px;
+    padding: 12px;
+    border: 1px solid var(--line);
+    border-radius: 12px;
+    background: #fff;
+    cursor: pointer;
+}
+
+.pipeline-option-content strong {
+    line-height: 1.25;
+}
+
+.pipeline-option-content small {
+    color: var(--muted);
+    line-height: 1.35;
+}
+
+.pipeline-option input:checked + .pipeline-option-content {
+    border-color: var(--accent);
+    background: rgba(181, 84, 47, 0.08);
+    box-shadow: inset 0 0 0 1px var(--accent);
+}
+
+.pipeline-option input:focus-visible + .pipeline-option-content {
+    outline: 3px solid rgba(181, 84, 47, 0.25);
+    outline-offset: 2px;
+}
+
 input[type="file"],
 select,
 button {
@@ -102,6 +162,14 @@ button:hover {
 
 .error p {
     color: var(--error);
+}
+
+.notice {
+    margin: 0 0 18px;
+    padding: 12px 14px;
+    border-left: 4px solid var(--accent);
+    background: rgba(181, 84, 47, 0.08);
+    color: var(--muted);
 }
 
 .preview {
@@ -154,5 +222,13 @@ button:hover {
     .panel {
         padding: 18px;
         border-radius: 16px;
+    }
+
+    .pipeline-options {
+        grid-template-columns: 1fr;
+    }
+
+    .pipeline-option-content {
+        min-height: auto;
     }
 }
