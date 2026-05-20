@@ -1,25 +1,24 @@
 import os
+import shutil
 from pathlib import Path
 from sklearn.metrics import classification_report, accuracy_score
 from collections import Counter
 from pipeline import load_models, process_image
 
-# ============================================================
-# НАСТРОЙКИ (укажите нужную папку)
-# ============================================================
-TEST_FOLDER = r"../pipeline/images"  # <-- замените на ваш путь
+
+TEST_FOLDER = r"../pipeline/images" 
 
 # поддерживаемые классы
-CLASS_NAMES = ["kgo_empty", "kgo_full", "kgo_none"]  # kgo_none соответствует "" (нет обнаружений)
+CLASS_NAMES = ["kgo_empty", "kgo_full", "kgo_none"] 
 
-def get_true_label(file_path: Path):
-    """Определяем истинную метку по имени родительской папки."""
-    # Проходим по родителям, ищем папку с именем kgo_empty или kgo_full
-    for parent in file_path.parents:
-        if parent.name.lower() == "kgo_empty":
-            return "kgo_empty"
-        if parent.name.lower() == "kgo_full":
-            return "kgo_full"
+def get_true_label(file_path: Path, test_root: Path):
+    try:
+        # Берём папку первого уровня внутри TEST_FOLDER
+        class_name = file_path.relative_to(test_root).parts[0].lower()
+        if class_name in CLASS_NAMES:
+            return class_name
+    except ValueError:
+        pass
     return None
 
 def main():
@@ -27,27 +26,27 @@ def main():
     if not test_folder.exists():
         raise FileNotFoundError(f"Папка {test_folder} не найдена.")
 
-    # Загрузка моделей
     print("Загрузка моделей...")
     load_models()
 
-    # Сбор файлов (jpg, png) рекурсивно
     image_extensions = {".jpg", ".jpeg", ".png"}
     image_files = [p for p in test_folder.rglob("*") if p.suffix.lower() in image_extensions]
 
     y_true = []
     y_pred = []
 
+    wrong_dir = Path("wrongPredictions")
+    wrong_dir.mkdir(parents=True, exist_ok=True)
+
     stats = Counter()
     miss_classified = []
     for img_path in image_files:
-        true_label = get_true_label(img_path)
+        true_label = get_true_label(img_path, test_folder)
         if true_label is None:
-            continue  # пропускаем файлы не из целевых папок
+            continue
 
         y_true.append(true_label)
         pred = process_image(str(img_path))
-        # заменяем "" на "kgo_none"
         if pred == "":
             pred_label = "kgo_none"
         else:
@@ -58,20 +57,22 @@ def main():
         if true_label != pred_label:
             miss_classified.append((str(img_path), true_label, pred_label))
             stats["errors"] += 1
+
+            safe_name = "_".join(img_path.relative_to(test_folder).parts)
+            dest_name = f"{true_label}_pred_{pred_label}_{safe_name}"
+            shutil.copy2(img_path, wrong_dir / dest_name)
+
         if pred_label == "kgo_none":
             stats["misses"] += 1
 
-    # Метрики
     print(f"\nОбработано изображений: {stats['total']}")
     print(f"Ошибок: {stats['errors']}")
     print(f"Пропусков (не обнаружено): {stats['misses']}")
 
-    # Генерируем отчёт
     report = classification_report(y_true, y_pred, labels=CLASS_NAMES,
                                    target_names=CLASS_NAMES, zero_division=0)
     accuracy = accuracy_score(y_true, y_pred)
 
-    # Сохраняем в report.txt
     with open("report.txt", "w", encoding="utf-8") as f:
         f.write(f"Папка: {test_folder}\n")
         f.write(f"Количество изображений: {stats['total']}\n")
