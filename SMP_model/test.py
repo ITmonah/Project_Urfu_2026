@@ -1,15 +1,3 @@
-"""
-test.py – Тестирование пайплайна с сохранением визуализаций в success/errors.
-Показывает процент заполнения на изображении.
-Структура:
-    images/
-        kgo_full/
-        kgo_empty/
-Результат:
-    success/   – верно классифицированные
-    errors/    – ошибочные (включая случаи, когда зона не найдена)
-"""
-
 import os
 import glob
 import cv2
@@ -23,14 +11,13 @@ from sklearn.metrics import (
 from pipeline import KGOFillPipeline
 
 
-# ---------- сбор данных ----------
 def collect_dataset(root_dir: str):
     image_paths = []
     true_labels = []
     for label in ["kgo_full", "kgo_empty"]:
         folder = os.path.join(root_dir, label)
         if not os.path.isdir(folder):
-            print(f"Папка {folder} не найдена, пропускаем.")
+            print(f"Папка {folder} не найдена")
             continue
         for ext in ["jpg", "jpeg", "png", "bmp", "tiff"]:
             for path in glob.glob(os.path.join(folder, f"*.{ext}")):
@@ -39,15 +26,7 @@ def collect_dataset(root_dir: str):
     return image_paths, true_labels
 
 
-# ---------- визуализация ----------
 def draw_segmentation_overlay(crop, mask, alpha=0.5):
-    """
-    Накладывает цветную маску на кроп.
-    crop: исходный BGR-кроп
-    mask: np.ndarray (H,W) с классами 0..3
-    alpha: прозрачность
-    Возвращает BGR-изображение.
-    """
     colors = {
         0: (0, 0, 0),         # фон
         1: (255, 0, 0),       # пол – синий
@@ -64,15 +43,6 @@ def draw_segmentation_overlay(crop, mask, alpha=0.5):
 
 
 def make_visualization(original_image, bbox, mask, segm_size, fill_ratio=None):
-    """
-    Создаёт итоговое изображение для сохранения.
-    original_image: исходное BGR-изображение
-    bbox: (x1,y1,x2,y2) или None
-    mask: np.ndarray маски или None
-    segm_size: размер маски (для ресайза)
-    fill_ratio: float (0..1) или None
-    Возвращает BGR-изображение.
-    """
     vis = original_image.copy()
 
     if bbox is not None:
@@ -98,13 +68,11 @@ def make_visualization(original_image, bbox, mask, segm_size, fill_ratio=None):
             3,
         )
 
-    # Отображение процента заполнения
     if fill_ratio is not None:
         text = f"Fill: {fill_ratio:.1%}"
     else:
         text = "Fill: N/A"
 
-    # Белый фон для читаемости
     (text_w, text_h), _ = cv2.getTextSize(text, cv2.FONT_HERSHEY_SIMPLEX, 1.0, 2)
     cv2.rectangle(vis, (10, vis.shape[0] - 10 - text_h - 10), (10 + text_w + 10, vis.shape[0] - 10), (255, 255, 255), -1)
     cv2.putText(vis, text, (15, vis.shape[0] - 15), cv2.FONT_HERSHEY_SIMPLEX, 1.0, (0, 0, 0), 2)
@@ -112,7 +80,6 @@ def make_visualization(original_image, bbox, mask, segm_size, fill_ratio=None):
     return vis
 
 
-# ---------- оценка ----------
 def evaluate_and_save(pipeline, image_paths, true_labels, output_dir="output"):
     success_dir = os.path.join(output_dir, "success")
     errors_dir = os.path.join(output_dir, "errors")
@@ -125,7 +92,7 @@ def evaluate_and_save(pipeline, image_paths, true_labels, output_dir="output"):
     for path, true_lbl in zip(image_paths, true_labels):
         image = cv2.imread(path)
         if image is None:
-            print(f"Не удалось загрузить {path}, пропускаем.")
+            print(f"Не удалось загрузить {path}")
             continue
 
         status, mask, bbox, fill_ratio = pipeline.predict_with_mask(image)
@@ -146,7 +113,6 @@ def evaluate_and_save(pipeline, image_paths, true_labels, output_dir="output"):
     return y_true, y_pred
 
 
-# ---------- отчёт ----------
 def print_report(y_true, y_pred):
     labels = ["kgo_empty", "kgo_full", "no_zone"]
     acc = accuracy_score(y_true, y_pred)
@@ -154,9 +120,7 @@ def print_report(y_true, y_pred):
         y_true, y_pred, labels=labels, zero_division=0
     )
 
-    print("=" * 60)
-    print("         РЕЗУЛЬТАТЫ ТЕСТИРОВАНИЯ ПАЙПЛАЙНА")
-    print("=" * 60)
+    print("РЕЗУЛЬТАТЫ ТЕСТИРОВАНИЯ ПАЙПЛАЙНА")
     print(f"Всего изображений: {len(y_true)}")
     print(f"Accuracy : {acc:.4f}\n")
 
@@ -186,7 +150,6 @@ def print_report(y_true, y_pred):
         print(row)
 
 
-# ---------- main ----------
 if __name__ == "__main__":
     IMAGE_ROOT = "images"
     YOLO_WEIGHTS = "Yolo26s_kgo.pt"

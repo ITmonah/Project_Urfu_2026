@@ -1,8 +1,3 @@
-"""
-pipeline.py – итоговый пайплайн оценки заполненности зоны КГО.
-Использует YOLO для детекции зоны (только класс 'kgo_platform') и DeepLabV3+ (SMP) для сегментации мусора.
-"""
-
 import cv2
 import numpy as np
 import torch
@@ -53,18 +48,10 @@ class KGOFillPipeline:
         ])
 
     def predict(self, image: np.ndarray) -> str:
-        """Только статус (без маски)."""
         status, _, _, _ = self._predict_internal(image)
         return status
 
     def predict_with_mask(self, image: np.ndarray):
-        """
-        Возвращает (status, pred_mask, bbox, fill_ratio).
-        status: 'kgo_full', 'kgo_empty' или ''
-        pred_mask: np.ndarray (H,W) с классами 0..3, или None
-        bbox: (x1, y1, x2, y2) или None
-        fill_ratio: float, доля мусора в зоне КГО (0..1), или None если зона не найдена
-        """
         return self._predict_internal(image)
 
     def _predict_internal(self, image: np.ndarray):
@@ -74,7 +61,6 @@ class KGOFillPipeline:
         if boxes is None or len(boxes) == 0:
             return "", None, None, None
 
-        # Фильтрация по классу 'kgo_platform'
         kgo_class_id = None
         for class_id, name in self.yolo_names.items():
             if name == "kgo_platform":
@@ -82,7 +68,7 @@ class KGOFillPipeline:
                 break
 
         if kgo_class_id is None:
-            print("Предупреждение: класс 'kgo_platform' не найден в модели YOLO, будут использованы все детекции.")
+            print("Предупреждение: класс 'kgo_platform' не найден в модели YOLO, будут использованы все детекции")
             filtered_boxes = boxes
         else:
             class_ids = boxes.cls.cpu().numpy() if boxes.cls is not None else []
