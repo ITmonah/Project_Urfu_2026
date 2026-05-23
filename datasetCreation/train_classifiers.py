@@ -1,0 +1,409 @@
+import argparse
+import json
+import random
+import shutil
+import tempfile
+import time
+from pathlib import Path
+
+import numpy as np
+import torch
+import torch.nn as nn
+from PIL import Image
+from sklearn.metrics import accuracy_score, f1_score, roc_auc_score
+from sklearn.model_selection import train_test_split
+from torch.utils.data import DataLoader, Dataset
+from torchvision import transforms
+from ultralytics import YOLO
+
+from pipeline.classifier_models import (
+    CLASS_NAMES,
+    IMAGENET_MEAN,
+    IMAGENET_STD,
+    MODEL_INPUT_SIZE,
+    SUPPORTED_MODELS,
+    create_classifier,
+)
+
+
+DEFAULT_DATASET_ROOT = Path("datasetCreation/cropped_datumaro")
+DEFAULT_OUTPUT_DIR = Path("artifacts/classification")
+
+
+class CropDataset(Dataset):
+    def __init__(self, image_paths, labels, transform):
+        self.image_paths = image_paths
+        self.labels = labels
+        self.transform = transform
+
+    def __len__(self):
+        return len(self.image_paths)
+
+    def __getitem__(self, index):
+        image = Image.open(self.image_paths[index]).convert("RGB")
+        return self.transform(image), self.labels[index]
+
+
+def parse_args():
+    parser = argparse.ArgumentParser(description="Train multiple classifiers on cropped KGO dataset.")
+    parser.add_argument("--dataset-root", type=Path, default=DEFAULT_DATASET_ROOT)
+    parser.add_argument("--output-dir", type=Path, default=DEFAULT_OUTPUT_DIR)
+    parser.add_argument(
+        "--models",
+        nargs="+",
+        default=["efficientnet_v2_s", "convnext_tiny"],
+        choices=SUPPORTED_MODELS,
+        help="Models to train. Use resnet50 to keep the previous baseline in the comparison.",
+    )
+    parser.add_argument("--epochs", type=int, default=30)
+    parser.add_argument("--batch-size", type=int, default=16)
+    parser.add_argument("--learning-rate", type=float, default=1e-4)
+    parser.add_argument("--weight-decay", type=float, default=1e-5)
+    parser.add_argument("--num-workers", type=int, default=0)
+    parser.add_argument("--early-stop-patience", type=int, default=4)
+    parser.add_argument("--seed", type=int, default=42)
+    parser.add_argument("--no-pretrained", action="store_true")
+    return parser.parse_args()
+
+
+def set_seed(seed: int):
+    random.seed(seed)
+    np.random.seed(seed)
+    torch.manual_seed(seed)
+    torch.cuda.manual_seed_all(seed)
+
+
+def build_transforms():
+    train_transform = transforms.Compose(
+        [
+            transforms.Resize((MODEL_INPUT_SIZE, MODEL_INPUT_SIZE)),
+            transforms.RandomHorizontalFlip(p=0.5),
+            transforms.RandomRotation(15),
+            transforms.ColorJitter(brightness=0.2, contrast=0.2, saturation=0.2),
+            transforms.ToTensor(),
+            transforms.Normalize(mean=IMAGENET_MEAN, std=IMAGENET_STD),
+        ]
+    )
+    eval_transform = transforms.Compose(
+        [
+            transforms.Resize((MODEL_INPUT_SIZE, MODEL_INPUT_SIZE)),
+            transforms.ToTensor(),
+            transforms.Normalize(mean=IMAGENET_MEAN, std=IMAGENET_STD),
+        ]
+    )
+    return train_transform, eval_transform
+
+
+def collect_samples(dataset_root: Path):
+    samples = [
+        (image_path, label_index)
+        for label_index, class_name in enumerate(CLASS_NAMES)
+        for image_path in sorted((dataset_root / class_name).glob("*.jpg"))
+    ]
+    if not samples:
+        raise RuntimeError(f"No .jpg files found in {dataset_root}")
+    image_paths, labels = zip(*samples)
+    return list(image_paths), list(labels)
+
+
+def split_samples(image_paths, labels, seed: int):
+    train_paths, temp_paths, train_labels, temp_labels = train_test_split(
+        image_paths,
+        labels,
+        test_size=0.30,
+        random_state=seed,
+        stratify=labels,
+    )
+    val_paths, test_paths, val_labels, test_labels = train_test_split(
+        temp_paths,
+        temp_labels,
+        test_size=0.50,
+        random_state=seed,
+        stratify=temp_labels,
+    )
+    return {
+        "train": (train_paths, train_labels),
+        "val": (val_paths, val_labels),
+        "test": (test_paths, test_labels),
+    }
+
+
+def prepare_yolo_dataset(splits, temp_root: Path):
+    for split_name in ("train", "val", "test"):
+        for image_path, label in zip(*splits[split_name]):
+            dest_dir = temp_root / split_name / CLASS_NAMES[label]
+            dest_dir.mkdir(parents=True, exist_ok=True)
+            shutil.copy2(image_path, dest_dir / image_path.name)
+
+
+def build_yolo_data_yaml(temp_root: Path):
+    yaml_lines = [
+        f"path: {temp_root}",
+        "train: train",
+        "val: val",
+        "test: test",
+        "names:",
+    ]
+    yaml_lines.extend(f"  {idx}: {name}" for idx, name in enumerate(CLASS_NAMES))
+    data_yaml_path = temp_root / "dataset.yaml"
+    data_yaml_path.write_text("\n".join(yaml_lines), encoding="utf-8")
+    return data_yaml_path
+
+
+def train_yolo_classifier(splits, args, device):
+    if args.no_pretrained:
+        print("[yolo] Warning: YOLO classification uses yolov8n-cls.pt pretrained weights by default.")
+
+    with tempfile.TemporaryDirectory() as tmpdir:
+        temp_root = Path(tmpdir)
+        prepare_yolo_dataset(splits, temp_root)
+        data_yaml_path = build_yolo_data_yaml(temp_root)
+
+        yolo_model = YOLO("yolov8n-cls.pt")
+        yolo_model.train(
+            data=str(data_yaml_path),
+            epochs=args.epochs,
+            batch=args.batch_size,
+            imgsz=MODEL_INPUT_SIZE,
+            workers=args.num_workers,
+            lr0=args.learning_rate,
+            device=str(device),
+            project=str(temp_root),
+            name="yolo_classifier",
+            exist_ok=True,
+        )
+
+        weights_dir = temp_root / "yolo_classifier" / "weights"
+        best_weights = weights_dir / "best.pt"
+        if not best_weights.exists():
+            best_weights = weights_dir / "last.pt"
+
+        trained_model = YOLO(str(best_weights))
+        state_dict = trained_model.model.state_dict()
+
+    return {
+        "model_name": "yolo",
+        "best_epoch": args.epochs,
+        "best_val": {"loss": float("inf"), "macro_f1": 0.0},
+        "test": {"loss": None, "accuracy": None, "macro_f1": None, "roc_auc": None},
+        "state_dict": state_dict,
+    }
+
+
+def create_dataloaders(splits, batch_size: int, num_workers: int):
+    train_transform, eval_transform = build_transforms()
+    return {
+        split_name: DataLoader(
+            CropDataset(paths, labels, train_transform if split_name == "train" else eval_transform),
+            batch_size=batch_size,
+            shuffle=split_name == "train",
+            num_workers=num_workers,
+            pin_memory=True,
+        )
+        for split_name, (paths, labels) in splits.items()
+    }
+
+
+def evaluate(model, dataloader, criterion, device):
+    model.eval()
+    total_loss = 0.0
+    all_labels = []
+    all_preds = []
+    all_probs = []
+
+    with torch.no_grad():
+        for images, labels in dataloader:
+            images = images.to(device)
+            labels = labels.to(device)
+
+            outputs = model(images)
+            loss = criterion(outputs, labels)
+            probs = torch.softmax(outputs, dim=1)
+            preds = outputs.argmax(dim=1)
+
+            total_loss += loss.item() * images.size(0)
+            all_labels.extend(labels.cpu().numpy().tolist())
+            all_preds.extend(preds.cpu().numpy().tolist())
+            all_probs.extend(probs[:, 1].cpu().numpy().tolist())
+
+    average_loss = total_loss / len(dataloader.dataset)
+    metrics = {
+        "loss": average_loss,
+        "accuracy": accuracy_score(all_labels, all_preds),
+        "macro_f1": f1_score(all_labels, all_preds, average="macro", zero_division=0),
+        "roc_auc": roc_auc_score(all_labels, all_probs) if len(set(all_labels)) > 1 else None,
+    }
+    return metrics
+
+
+def train_model(model_name, dataloaders, args, device, splits):
+    if model_name == "yolo":
+        return train_yolo_classifier(splits, args, device)
+
+    model = create_classifier(model_name, num_classes=len(CLASS_NAMES), pretrained=not args.no_pretrained).to(device)
+    criterion = nn.CrossEntropyLoss()
+    optimizer = torch.optim.AdamW(model.parameters(), lr=args.learning_rate, weight_decay=args.weight_decay)
+    scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer, mode="min", factor=0.5, patience=2)
+    scaler = torch.amp.GradScaler("cuda", enabled=device.type == "cuda")
+
+    best_state = None
+    best_metrics = None
+    best_epoch = -1
+    stale_epochs = 0
+
+    for epoch in range(1, args.epochs + 1):
+        model.train()
+        train_loss = 0.0
+        train_labels = []
+        train_preds = []
+
+        for images, labels in dataloaders["train"]:
+            images = images.to(device, non_blocking=True)
+            labels = labels.to(device, non_blocking=True)
+            optimizer.zero_grad(set_to_none=True)
+
+            with torch.amp.autocast("cuda", enabled=device.type == "cuda"):
+                outputs = model(images)
+                loss = criterion(outputs, labels)
+
+            scaler.scale(loss).backward()
+            scaler.step(optimizer)
+            scaler.update()
+
+            train_loss += loss.item() * images.size(0)
+            train_labels.extend(labels.detach().cpu().numpy().tolist())
+            train_preds.extend(outputs.argmax(dim=1).detach().cpu().numpy().tolist())
+
+        train_metrics = {
+            "loss": train_loss / len(dataloaders["train"].dataset),
+            "accuracy": accuracy_score(train_labels, train_preds),
+            "macro_f1": f1_score(train_labels, train_preds, average="macro", zero_division=0),
+        }
+        val_metrics = evaluate(model, dataloaders["val"], criterion, device)
+        scheduler.step(val_metrics["loss"])
+
+        is_better = (
+            best_metrics is None
+            or val_metrics["macro_f1"] > best_metrics["macro_f1"]
+            or (
+                val_metrics["macro_f1"] == best_metrics["macro_f1"]
+                and val_metrics["loss"] < best_metrics["loss"]
+            )
+        )
+
+        print(
+            f"[{model_name}] epoch {epoch:02d}/{args.epochs} "
+            f"train_loss={train_metrics['loss']:.4f} train_f1={train_metrics['macro_f1']:.4f} "
+            f"val_loss={val_metrics['loss']:.4f} val_f1={val_metrics['macro_f1']:.4f}"
+        )
+
+        if is_better:
+            best_state = {key: value.detach().cpu() for key, value in model.state_dict().items()}
+            best_metrics = val_metrics
+            best_epoch = epoch
+            stale_epochs = 0
+        else:
+            stale_epochs += 1
+            if stale_epochs >= args.early_stop_patience:
+                break
+
+    model.load_state_dict(best_state)
+    return {
+        "model_name": model_name,
+        "best_epoch": best_epoch,
+        "best_val": best_metrics,
+        "test": evaluate(model, dataloaders["test"], criterion, device),
+        "state_dict": best_state,
+    }
+
+
+def save_result(result, output_dir: Path, split_sizes, seed: int):
+    torch.save(
+        {
+            "model_name": result["model_name"],
+            "class_names": CLASS_NAMES,
+            "input_size": MODEL_INPUT_SIZE,
+            "state_dict": result["state_dict"],
+        },
+        output_dir / f"best_{result['model_name']}_kgo.pth",
+    )
+
+    (output_dir / f"metrics_{result['model_name']}.json").write_text(
+        json.dumps(
+            {
+                "model_name": result["model_name"],
+                "best_epoch": result["best_epoch"],
+                "best_val": result["best_val"],
+                "test": result["test"],
+                "split_sizes": split_sizes,
+                "seed": seed,
+            },
+            ensure_ascii=False,
+            indent=2,
+        ),
+        encoding="utf-8",
+    )
+
+
+def save_leaderboard(results, output_dir: Path):
+    leaderboard = sorted(
+        (
+            {
+                "model_name": result["model_name"],
+                "best_epoch": result["best_epoch"],
+                "val_macro_f1": result["best_val"]["macro_f1"],
+                "val_loss": result["best_val"]["loss"],
+                "test_macro_f1": result["test"]["macro_f1"],
+                "test_accuracy": result["test"]["accuracy"],
+                "test_roc_auc": result["test"]["roc_auc"],
+            }
+            for result in results
+        ),
+        key=lambda item: (-item["val_macro_f1"], item["val_loss"]),
+    )
+    (output_dir / "leaderboard.json").write_text(
+        json.dumps(leaderboard, ensure_ascii=False, indent=2),
+        encoding="utf-8",
+    )
+
+
+def main():
+    args = parse_args()
+    dataset_root = args.dataset_root
+    output_dir = args.output_dir
+
+    if not dataset_root.exists():
+        raise FileNotFoundError(
+            f"Dataset root not found: {dataset_root}. "
+            "Run datasetCreation/prepare_datumaro_dataset.py first."
+        )
+
+    set_seed(args.seed)
+    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    print(f"Using device: {device}")
+
+    image_paths, labels = collect_samples(dataset_root)
+    splits = split_samples(image_paths, labels, seed=args.seed)
+    split_sizes = {split_name: len(paths) for split_name, (paths, _) in splits.items()}
+    dataloaders = create_dataloaders(splits, batch_size=args.batch_size, num_workers=args.num_workers)
+    output_dir.mkdir(parents=True, exist_ok=True)
+    print("Split sizes:", split_sizes)
+
+    results = []
+    for model_name in args.models:
+        started_at = time.time()
+        result = train_model(model_name, dataloaders, args, device, splits)
+        result["elapsed_seconds"] = round(time.time() - started_at, 2)
+        save_result(result, output_dir, split_sizes, args.seed)
+        results.append(result)
+        print(
+            f"[{model_name}] done in {result['elapsed_seconds']}s "
+            f"test_f1={result['test']['macro_f1']:.4f} test_acc={result['test']['accuracy']:.4f}"
+        )
+
+    save_leaderboard(results, output_dir)
+    print(f"Saved checkpoints and metrics to {output_dir}")
+
+
+if __name__ == "__main__":
+    main()

@@ -1,3 +1,5 @@
+--index-url https://download.pytorch.org/whl/cu130
+
 torch
 torchvision
 pillow
@@ -6,3 +8,5 @@ pandas
 matplotlib
 seaborn
 scikit-learn
+ultralytics
+transformers==4.25.1

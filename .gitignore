@@ -12,6 +12,7 @@ datasetCreation/temp_extract
 datasetCreation/YoloDatasetReady
 datasets/
 dataset/
+output/
 artifacts
 .venv
 venv

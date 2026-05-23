@@ -1,0 +1,80 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>KGO Pipeline UI</title>
+    <link rel="stylesheet" href="{{ url_for('static', path='/styles.css') }}">
+</head>
+<body>
+    <main class="page">
+        <section class="panel hero">
+            <p class="eyebrow">FastAPI + Web UI</p>
+            <h1>Запуск пайплайна по изображению</h1>
+            <p class="subtitle">Загрузите картинку, выберите классификатор и получите результат детекции + классификации.</p>
+        </section>
+
+        <section class="panel">
+            <form action="/run" method="post" enctype="multipart/form-data" class="form">
+                <label class="field">
+                    <span>Изображение</span>
+                    <input type="file" name="image" accept="image/*" required>
+                </label>
+
+                <label class="field">
+                    <span>Классификатор</span>
+                    <select name="model" required>
+                        {% for item in models %}
+                        <option value="{{ item.name }}" {% if item.name == selected_model %}selected{% endif %}>
+                            {{ item.name }}{% if not item.available %} (checkpoint не найден){% endif %}
+                        </option>
+                        {% endfor %}
+                    </select>
+                </label>
+
+                <button type="submit">Запустить</button>
+            </form>
+
+            <p class="hint">API endpoint: <code>POST /api/predict</code> с полями формы <code>image</code> и <code>model</code>.</p>
+        </section>
+
+        {% if error %}
+        <section class="panel error">
+            <h2>Ошибка</h2>
+            <p>{{ error }}</p>
+        </section>
+        {% endif %}
+
+        {% if image_preview %}
+        <section class="panel">
+            <h2>Загруженное изображение</h2>
+            <img src="{{ image_preview }}" alt="Uploaded image preview" class="preview">
+        </section>
+        {% endif %}
+
+        {% if result %}
+        <section class="panel">
+            <h2>Результат</h2>
+            <dl class="meta">
+                <div><dt>Модель</dt><dd>{{ result.model }}</dd></div>
+                <div><dt>Checkpoint классификатора</dt><dd>{{ result.classifier_checkpoint }}</dd></div>
+                <div><dt>Checkpoint YOLO</dt><dd>{{ result.yolo_checkpoint }}</dd></div>
+            </dl>
+
+            {% if result.predictions %}
+            <ul class="predictions">
+                {% for item in result.predictions %}
+                <li>
+                    <strong>{{ loop.index }}. {{ item.label }}</strong>
+                    <span>bbox: {{ item.bbox }}</span>
+                </li>
+                {% endfor %}
+            </ul>
+            {% else %}
+            <p>Объекты класса <code>kgo_platform</code> не найдены.</p>
+            {% endif %}
+        </section>
+        {% endif %}
+    </main>
+</body>
+</html>
