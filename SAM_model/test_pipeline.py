@@ -6,7 +6,7 @@ import pandas as pd
 
 warnings.filterwarnings("ignore")
 
-from pipeline import (
+from SAM_model.pipeline import (
     load_models,
     process_image,
     process_and_visualize,
