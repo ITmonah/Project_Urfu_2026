@@ -33,18 +33,18 @@ full_cls_model = None
 CLASS_NAMES = []
 FULL_CLASS_NAMES = []
 
-def load_models():
+def load_models(yolo_path=YOLO_PATH, cls_path=CLS_PATH, full_cls_path=FULL_CLS_PATH):
     global det_model, cls_model, full_cls_model, CLASS_NAMES, FULL_CLASS_NAMES
 
     with warnings.catch_warnings():
         warnings.simplefilter("ignore")
-        if not os.path.exists(YOLO_PATH):
-            raise FileNotFoundError(f'YOLO не найден: {YOLO_PATH}')
-        det_model = YOLO(YOLO_PATH)
+        if not os.path.exists(yolo_path):
+            raise FileNotFoundError(f'YOLO не найден: {yolo_path}')
+        det_model = YOLO(yolo_path)
 
-        if not os.path.exists(CLS_PATH):
-            raise FileNotFoundError(f'Классификатор (2 класса) не найден: {CLS_PATH}')
-        checkpoint_old = torch.load(CLS_PATH, map_location=device)
+        if not os.path.exists(cls_path):
+            raise FileNotFoundError(f'Классификатор (2 класса) не найден: {cls_path}')
+        checkpoint_old = torch.load(cls_path, map_location=device)
         if 'class_names' in checkpoint_old:
             CLASS_NAMES = checkpoint_old['class_names']
             num_classes = len(CLASS_NAMES)
@@ -55,9 +55,9 @@ def load_models():
         cls_model.to(device)
         cls_model.eval()
 
-        if not os.path.exists(FULL_CLS_PATH):
-            raise FileNotFoundError(f'Классификатор (3 класса) не найден: {FULL_CLS_PATH}')
-        checkpoint_new = torch.load(FULL_CLS_PATH, map_location=device)
+        if not os.path.exists(full_cls_path):
+            raise FileNotFoundError(f'Классификатор (3 класса) не найден: {full_cls_path}')
+        checkpoint_new = torch.load(full_cls_path, map_location=device)
         if 'class_names' in checkpoint_new:
             FULL_CLASS_NAMES = checkpoint_new['class_names']
             num_classes_full = len(FULL_CLASS_NAMES)
