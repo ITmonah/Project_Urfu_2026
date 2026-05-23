@@ -11,7 +11,7 @@ class KGOFillPipeline:
     def __init__(
         self,
         yolo_path: str = "Yolo26s_kgo.pt",
-        segm_path: str = "best_model.pth",
+        segm_path: str = "best_model_SMP.pth",
         segm_encoder: str = "se_resnext50_32x4d",
         segm_classes: int = 4,
         fill_threshold: float = 0.5,

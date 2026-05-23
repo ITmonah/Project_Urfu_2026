@@ -11,6 +11,10 @@ from PIL import Image, ImageDraw, ImageFont
 
 
 ROOT_DIR = Path(__file__).resolve().parents[1]
+os.environ.setdefault("NO_ALBUMENTATIONS_UPDATE", "1")
+ULTRALYTICS_CONFIG_DIR = ROOT_DIR / ".tmp" / "ultralytics"
+ULTRALYTICS_CONFIG_DIR.mkdir(parents=True, exist_ok=True)
+os.environ.setdefault("YOLO_CONFIG_DIR", str(ULTRALYTICS_CONFIG_DIR))
 
 
 @dataclass(frozen=True)
@@ -62,7 +66,7 @@ PIPELINE_SPECS: tuple[PipelineSpec, ...] = (
         description="Segmentation Models PyTorch pipeline.",
         checkpoints=(
             CheckpointSpec("YOLO", "KGO_SMP_YOLO_CHECKPOINT", ROOT_DIR / "SMP_model" / "Yolo26s_kgo.pt"),
-            CheckpointSpec("SMP", "KGO_SMP_CHECKPOINT", ROOT_DIR / "SMP_model" / "best_model.pth"),
+            CheckpointSpec("SMP", "KGO_SMP_CHECKPOINT", ROOT_DIR / "SMP_model" / "best_model_SMP.pth"),
         ),
     ),
 )

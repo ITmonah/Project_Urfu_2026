@@ -28,6 +28,7 @@ uvicorn fastapi_app.main:app --reload
 - `KGO_SMP_CHECKPOINT`
 
 Если checkpoint не найден, главная страница продолжит открываться, а запуск выбранного пайплайна вернет понятную ошибку.
+Для `SMP_model` fallback-файлы: `SMP_model/Yolo26s_kgo.pt` и `SMP_model/best_model_SMP.pth`.
 
 ## API
 
