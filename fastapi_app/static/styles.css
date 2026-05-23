@@ -172,6 +172,45 @@ button:hover {
     background: var(--accent-dark);
 }
 
+button:disabled {
+    background: #9f8f82;
+    cursor: wait;
+}
+
+.actions {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    flex-wrap: wrap;
+}
+
+.loading-indicator {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    color: var(--muted);
+    font-size: 14px;
+}
+
+.loading-indicator[hidden] {
+    display: none;
+}
+
+.spinner {
+    width: 18px;
+    height: 18px;
+    border: 2px solid rgba(181, 84, 47, 0.25);
+    border-top-color: var(--accent);
+    border-radius: 50%;
+    animation: spin 0.8s linear infinite;
+}
+
+@keyframes spin {
+    to {
+        transform: rotate(360deg);
+    }
+}
+
 .error {
     border-color: rgba(143, 45, 35, 0.35);
 }
@@ -250,5 +289,10 @@ button:hover {
 
     .pipeline-option-content {
         min-height: auto;
+    }
+
+    .actions {
+        align-items: flex-start;
+        flex-direction: column;
     }
 }
