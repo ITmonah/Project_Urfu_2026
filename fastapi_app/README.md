@@ -27,3 +27,10 @@ uvicorn fastapi_app.main:app --reload
 Form-data:
 - `image`: файл изображения
 - `model`: имя классификатора, например `convnext_tiny`
+- `pipeline`: optional тип пайплайна, по умолчанию `yolo_classifier`
+
+Доступные значения `pipeline`:
+- `whole_image_classifier`: классификатор по всей картинке
+- `yolo_classifier`: YOLO + классификатор
+- `segmentation`: сегментация
+

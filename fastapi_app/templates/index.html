@@ -11,7 +11,7 @@
         <section class="panel hero">
             <p class="eyebrow">FastAPI + Web UI</p>
             <h1>Запуск пайплайна по изображению</h1>
-            <p class="subtitle">Загрузите картинку, выберите классификатор и получите результат детекции + классификации.</p>
+            <p class="subtitle">Загрузите картинку, выберите тип пайплайна и классификатор, затем получите результат обработки.</p>
         </section>
 
         <section class="panel">
@@ -20,6 +20,26 @@
                     <span>Изображение</span>
                     <input type="file" name="image" accept="image/*" required>
                 </label>
+
+                <fieldset class="field pipeline-field">
+                    <legend>Тип пайплайна</legend>
+                    <div class="pipeline-options">
+                        {% for item in pipeline_modes %}
+                        <label class="pipeline-option">
+                            <input
+                                type="radio"
+                                name="pipeline"
+                                value="{{ item.name }}"
+                                {% if item.name == selected_pipeline %}checked{% endif %}
+                            >
+                            <span class="pipeline-option-content">
+                                <strong>{{ item.label }}</strong>
+                                <small>{{ item.description }}</small>
+                            </span>
+                        </label>
+                        {% endfor %}
+                    </div>
+                </fieldset>
 
                 <label class="field">
                     <span>Классификатор</span>
@@ -35,7 +55,7 @@
                 <button type="submit">Запустить</button>
             </form>
 
-            <p class="hint">API endpoint: <code>POST /api/predict</code> с полями формы <code>image</code> и <code>model</code>.</p>
+            <p class="hint">API endpoint: <code>POST /api/predict</code> с полями формы <code>image</code>, <code>model</code> и optional <code>pipeline</code>.</p>
         </section>
 
         {% if error %}
@@ -56,10 +76,16 @@
         <section class="panel">
             <h2>Результат</h2>
             <dl class="meta">
+                <div><dt>Выбранный пайплайн</dt><dd>{{ result.selected_pipeline_label }}</dd></div>
+                <div><dt>Фактически выполнено</dt><dd>{{ result.actual_pipeline_label }}</dd></div>
                 <div><dt>Модель</dt><dd>{{ result.model }}</dd></div>
                 <div><dt>Checkpoint классификатора</dt><dd>{{ result.classifier_checkpoint }}</dd></div>
                 <div><dt>Checkpoint YOLO</dt><dd>{{ result.yolo_checkpoint }}</dd></div>
             </dl>
+
+            {% if result.pipeline_notice %}
+            <p class="notice">{{ result.pipeline_notice }}</p>
+            {% endif %}
 
             {% if result.predictions %}
             <ul class="predictions">
