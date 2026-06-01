@@ -11,7 +11,7 @@
         <section class="panel hero">
             <p class="eyebrow">FastAPI + Web UI</p>
             <h1>Запуск пайплайна по изображению</h1>
-            <p class="subtitle">Загрузите картинку, выберите тип пайплайна и классификатор, затем получите результат обработки.</p>
+            <p class="subtitle">Загрузите картинку, выберите один из трёх пайплайнов и получите результат обработки.</p>
         </section>
 
         <section class="panel">
@@ -35,27 +35,25 @@
                             <span class="pipeline-option-content">
                                 <strong>{{ item.label }}</strong>
                                 <small>{{ item.description }}</small>
+                                {% if not item.available %}
+                                <em>Checkpoint не найден</em>
+                                {% endif %}
                             </span>
                         </label>
                         {% endfor %}
                     </div>
                 </fieldset>
 
-                <label class="field">
-                    <span>Классификатор</span>
-                    <select name="model" required>
-                        {% for item in models %}
-                        <option value="{{ item.name }}" {% if item.name == selected_model %}selected{% endif %}>
-                            {{ item.name }}{% if not item.available %} (checkpoint не найден){% endif %}
-                        </option>
-                        {% endfor %}
-                    </select>
-                </label>
-
-                <button type="submit">Запустить</button>
+                <div class="actions">
+                    <button type="submit" data-submit-button>Запустить</button>
+                    <span class="loading-indicator" data-loading-indicator hidden>
+                        <span class="spinner" aria-hidden="true"></span>
+                        Выполняется обработка
+                    </span>
+                </div>
             </form>
 
-            <p class="hint">API endpoint: <code>POST /api/predict</code> с полями формы <code>image</code>, <code>model</code> и optional <code>pipeline</code>.</p>
+            <p class="hint">API endpoint: <code>POST /api/predict</code> с полями формы <code>image</code> и optional <code>pipeline</code>.</p>
         </section>
 
         {% if error %}
@@ -76,23 +74,33 @@
         <section class="panel">
             <h2>Результат</h2>
             <dl class="meta">
-                <div><dt>Выбранный пайплайн</dt><dd>{{ result.selected_pipeline_label }}</dd></div>
-                <div><dt>Фактически выполнено</dt><dd>{{ result.actual_pipeline_label }}</dd></div>
-                <div><dt>Модель</dt><dd>{{ result.model }}</dd></div>
-                <div><dt>Checkpoint классификатора</dt><dd>{{ result.classifier_checkpoint }}</dd></div>
-                <div><dt>Checkpoint YOLO</dt><dd>{{ result.yolo_checkpoint }}</dd></div>
+                <div><dt>Пайплайн</dt><dd>{{ result.pipeline_label }}</dd></div>
+                <div><dt>Итоговая метка</dt><dd>{{ result.label if result.label else "Платформа не найдена" }}</dd></div>
+                {% if result.fill_percentage is not none %}
+                <div><dt>Заполненность</dt><dd>{{ result.fill_percentage }}%</dd></div>
+                {% endif %}
+                {% if result.bbox %}
+                <div><dt>bbox</dt><dd>{{ result.bbox }}</dd></div>
+                {% endif %}
             </dl>
 
-            {% if result.pipeline_notice %}
-            <p class="notice">{{ result.pipeline_notice }}</p>
-            {% endif %}
+            <h3>Checkpoint</h3>
+            <dl class="meta checkpoints">
+                {% for checkpoint in result.checkpoints %}
+                <div>
+                    <dt>{{ checkpoint.label }} ({{ checkpoint.env_var }})</dt>
+                    <dd>{{ checkpoint.path }}</dd>
+                </div>
+                {% endfor %}
+            </dl>
 
             {% if result.predictions %}
             <ul class="predictions">
                 {% for item in result.predictions %}
                 <li>
                     <strong>{{ loop.index }}. {{ item.label }}</strong>
-                    <span>bbox: {{ item.bbox }}</span>
+                    {% if item.bbox %}<span>bbox: {{ item.bbox }}</span>{% endif %}
+                    {% if item.fill_percentage is not none %}<span>fill: {{ item.fill_percentage }}%</span>{% endif %}
                 </li>
                 {% endfor %}
             </ul>
@@ -102,5 +110,19 @@
         </section>
         {% endif %}
     </main>
+    <script>
+        const form = document.querySelector(".form");
+        const submitButton = document.querySelector("[data-submit-button]");
+        const loadingIndicator = document.querySelector("[data-loading-indicator]");
+
+        if (form && submitButton && loadingIndicator) {
+            form.addEventListener("submit", () => {
+                submitButton.disabled = true;
+                submitButton.textContent = "Обработка...";
+                loadingIndicator.hidden = false;
+                form.setAttribute("aria-busy", "true");
+            });
+        }
+    </script>
 </body>
 </html>

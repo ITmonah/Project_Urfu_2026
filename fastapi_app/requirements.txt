@@ -2,3 +2,11 @@ fastapi
 uvicorn[standard]
 jinja2
 python-multipart
+torch
+torchvision
+ultralytics
+opencv-python
+numpy
+albumentations
+segmentation-models-pytorch
+segment-anything
