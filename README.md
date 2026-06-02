@@ -46,7 +46,7 @@ python datasetCreation\train_classifiers.py
 - `--dataset-root` - папка с подготовленными изображениями классов, по умолчанию `datasetCreation/cropped_datumaro`
 - `--output-dir` - куда сохранять чекпоинты и метрики, по умолчанию `artifacts/classification`
 - `--models` - список моделей для обучения, по умолчанию `efficientnet_v2_s convnext_tiny`
-- `--epochs` - число эпох, по умолчанию `30`
+- `--epochs` - количество эпох, по умолчанию `30`
 - `--batch-size` - размер батча, по умолчанию `16`
 - `--learning-rate` - learning rate, по умолчанию `1e-4`
 - `--weight-decay` - weight decay, по умолчанию `1e-5`
