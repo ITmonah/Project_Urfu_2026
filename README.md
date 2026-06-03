@@ -35,7 +35,7 @@ Form-data:
 Файлы `.pt` и `.pth` не хранятся в основном репозитории. Приложение скачивает их при первом запуске выбранного пайплайна из GitHub Releases отдельного репозитория:
 
 ```text
-https://github.com/likip3/AI_Models/releases/tag/v1
+https://github.com/likip3/AI-Models/releases/tag/v1
 ```
 
 Ожидаемые release assets:
@@ -49,7 +49,7 @@ https://github.com/likip3/AI_Models/releases/tag/v1
 Настройки по умолчанию:
 
 ```powershell
-$env:KGO_MODEL_REPO = "likip3/AI_Models"
+$env:KGO_MODEL_REPO = "likip3/AI-Models"
 $env:KGO_MODEL_RELEASE_TAG = "v1"
 $env:KGO_MODEL_CACHE_DIR = ".model_cache"
 ```
@@ -82,7 +82,7 @@ docker build -t project-urfu-2026 .
 
 ```powershell
 docker run --rm -p 8000:8000 `
-  -e KGO_MODEL_REPO=likip3/AI_Models `
+  -e KGO_MODEL_REPO=likip3/AI-Models `
   -e KGO_MODEL_RELEASE_TAG=v1 `
   project-urfu-2026
 ```

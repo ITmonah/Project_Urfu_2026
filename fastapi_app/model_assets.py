@@ -6,7 +6,7 @@ from urllib.request import Request, urlopen
 
 
 ROOT_DIR = Path(__file__).resolve().parents[1]
-DEFAULT_MODEL_REPO = "likip3/AI_Models"
+DEFAULT_MODEL_REPO = "likip3/AI-Models"
 DEFAULT_MODEL_RELEASE_TAG = "v1"
 
 

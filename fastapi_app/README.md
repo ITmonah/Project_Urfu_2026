@@ -18,11 +18,11 @@ uvicorn fastapi_app.main:app --reload
 ## Checkpoints
 
 Файлы `.pt` и `.pth` должны храниться в отдельном репозитории с GitHub Releases.
-По умолчанию приложение скачивает недостающие веса из `likip3/AI_Models`, release tag `v1`, и кеширует их в `.model_cache`.
+По умолчанию приложение скачивает недостающие веса из `likip3/AI-Models`, release tag `v1`, и кеширует их в `.model_cache`.
 
 Общие настройки:
 
-- `KGO_MODEL_REPO` - по умолчанию `likip3/AI_Models`
+- `KGO_MODEL_REPO` - по умолчанию `likip3/AI-Models`
 - `KGO_MODEL_RELEASE_TAG` - по умолчанию `v1`
 - `KGO_MODEL_CACHE_DIR` - по умолчанию `.model_cache`
 - `KGO_MODEL_AUTH_TOKEN` - optional token для private repository
