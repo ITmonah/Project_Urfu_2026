@@ -83,6 +83,33 @@ docker run --rm -p 8000:8000 `
 
 После запуска приложение доступно на `http://127.0.0.1:8000`.
 
+В Docker image включена переменная:
+
+```text
+KGO_PRELOAD_MODEL_ASSETS=1
+```
+
+Поэтому контейнер скачивает все модельные веса в `/app/.model_cache` при старте, до начала обработки запросов.
+Прогресс скачивания пишется в консоль контейнера с префиксом `[model-assets]`.
+
+Чтобы не скачивать веса заново после каждого запуска, подключите Docker volume:
+
+```powershell
+docker run --rm -p 8000:8000 `
+  -v kgo_model_cache:/app/.model_cache `
+  -e KGO_MODEL_REPO=likip3/AI-Models `
+  -e KGO_MODEL_RELEASE_TAG=v1 `
+  project-urfu-2026
+```
+
+Для отключения preload:
+
+```powershell
+docker run --rm -p 8000:8000 `
+  -e KGO_PRELOAD_MODEL_ASSETS=0 `
+  project-urfu-2026
+```
+
 ## CI/CD
 
 Workflow `.github/workflows/ci.yml` выполняет:

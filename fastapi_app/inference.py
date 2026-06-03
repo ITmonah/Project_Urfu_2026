@@ -163,11 +163,27 @@ def pipeline_checkpoints(spec: PipelineSpec) -> list[dict[str, Any]]:
     return checkpoints
 
 
-def ensure_checkpoints(spec: PipelineSpec) -> dict[str, Path]:
+def ensure_checkpoints(spec: PipelineSpec, *, log_progress: bool = False) -> dict[str, Path]:
     return {
-        checkpoint.env_var: ensure_model_asset(checkpoint.to_model_asset())
+        checkpoint.env_var: ensure_model_asset(checkpoint.to_model_asset(), log_progress=log_progress)
         for checkpoint in spec.checkpoints
     }
+
+
+def ensure_all_checkpoints(*, log_progress: bool = False) -> list[dict[str, str]]:
+    resolved = []
+    for pipeline_spec in PIPELINE_SPECS:
+        for checkpoint in pipeline_spec.checkpoints:
+            path = ensure_model_asset(checkpoint.to_model_asset(), log_progress=log_progress)
+            resolved.append(
+                {
+                    "pipeline": pipeline_spec.name,
+                    "label": checkpoint.label,
+                    "asset_name": checkpoint.asset_name,
+                    "path": str(path),
+                }
+            )
+    return resolved
 
 
 def list_available_pipelines() -> list[dict[str, Any]]:

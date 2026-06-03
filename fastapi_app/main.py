@@ -1,3 +1,5 @@
+import os
+from contextlib import asynccontextmanager
 from pathlib import Path
 
 from fastapi import FastAPI, File, Form, Request, UploadFile
@@ -7,6 +9,7 @@ from fastapi.templating import Jinja2Templates
 
 from fastapi_app.inference import (
     DEFAULT_PIPELINE,
+    ensure_all_checkpoints,
     image_to_data_url,
     list_available_pipelines,
     run_inference,
@@ -15,7 +18,20 @@ from fastapi_app.inference import (
 
 BASE_DIR = Path(__file__).resolve().parent
 
-app = FastAPI(title="KGO Pipeline UI")
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    if os.getenv("KGO_PRELOAD_MODEL_ASSETS", "0").lower() not in {"1", "true", "yes"}:
+        yield
+        return
+
+    print("[model-assets] Preloading all model assets before serving requests.", flush=True)
+    resolved = ensure_all_checkpoints(log_progress=True)
+    print(f"[model-assets] Preload complete. Resolved {len(resolved)} asset(s).", flush=True)
+    yield
+
+
+app = FastAPI(title="KGO Pipeline UI", lifespan=lifespan)
 app.mount("/static", StaticFiles(directory=BASE_DIR / "static"), name="static")
 templates = Jinja2Templates(directory=str(BASE_DIR / "templates"))
 

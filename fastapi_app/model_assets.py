@@ -1,4 +1,6 @@
 import os
+import sys
+import time
 from dataclasses import dataclass
 from pathlib import Path
 from urllib.error import URLError
@@ -68,9 +70,30 @@ def model_asset_status(spec: ModelAssetSpec) -> dict[str, str | bool]:
     }
 
 
-def ensure_model_asset(spec: ModelAssetSpec) -> Path:
+def _content_length(response) -> int | None:
+    value = response.headers.get("Content-Length") if hasattr(response, "headers") else None
+    if not value:
+        return None
+    try:
+        return int(value)
+    except ValueError:
+        return None
+
+
+def _format_size(size_bytes: int) -> str:
+    size_mb = size_bytes / (1024 * 1024)
+    return f"{size_mb:.1f} MB"
+
+
+def _log_progress(message: str) -> None:
+    print(message, flush=True, file=sys.stderr)
+
+
+def ensure_model_asset(spec: ModelAssetSpec, *, log_progress: bool = False) -> Path:
     destination = resolve_model_asset_path(spec)
     if destination.exists():
+        if log_progress:
+            _log_progress(f"[model-assets] {spec.asset_name} already exists: {destination}")
         return destination
 
     destination.parent.mkdir(parents=True, exist_ok=True)
@@ -84,14 +107,37 @@ def ensure_model_asset(spec: ModelAssetSpec) -> Path:
 
     request = Request(url, headers=headers)
     try:
+        if log_progress:
+            _log_progress(f"[model-assets] Downloading {spec.asset_name} from {url}")
         with urlopen(request, timeout=60) as response:
+            total_size = _content_length(response)
+            downloaded_size = 0
+            last_log_at = time.monotonic()
             with temp_destination.open("wb") as output:
                 while True:
                     chunk = response.read(1024 * 1024)
                     if not chunk:
                         break
                     output.write(chunk)
+                    downloaded_size += len(chunk)
+                    if log_progress:
+                        now = time.monotonic()
+                        if now - last_log_at >= 2:
+                            if total_size:
+                                percent = downloaded_size / total_size * 100
+                                _log_progress(
+                                    "[model-assets] "
+                                    f"{spec.asset_name}: {_format_size(downloaded_size)} / "
+                                    f"{_format_size(total_size)} ({percent:.1f}%)"
+                                )
+                            else:
+                                _log_progress(
+                                    f"[model-assets] {spec.asset_name}: {_format_size(downloaded_size)} downloaded"
+                                )
+                            last_log_at = now
         temp_destination.replace(destination)
+        if log_progress:
+            _log_progress(f"[model-assets] Finished {spec.asset_name}: {destination}")
     except (OSError, URLError) as exc:
         if temp_destination.exists():
             temp_destination.unlink()
