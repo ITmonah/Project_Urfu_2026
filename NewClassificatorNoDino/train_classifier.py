@@ -1,10 +1,7 @@
-import argparse
 import json
 import random
-import time
 from pathlib import Path
 import sys
-from pathlib import Path
 
 # Поднимаемся на два уровня вверх (из train_classifier/ в корень проекта) и добавляем в sys.path
 project_root = Path(__file__).resolve().parent.parent
@@ -20,8 +17,6 @@ from sklearn.metrics import (
     balanced_accuracy_score,
     classification_report,
     f1_score,
-    precision_score,
-    recall_score,
     roc_auc_score,
 )
 from sklearn.model_selection import train_test_split
