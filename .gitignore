@@ -28,6 +28,12 @@ report3.txt
 .vscode
 .tmp
 .deps
+.env
+.model_cache
+.pytest_tmp
+.pytest_cache
+.ruff_cache
+*.part
 *.zip
 .zip
 Yolo_dataset_ready

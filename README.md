@@ -1,71 +1,118 @@
-## Запуск
+# KGO ML Pipeline
 
-Быстрая проверка, что пайплайн поднимается и модельные веса читаются:
+Web/API-приложение на FastAPI для запуска пайплайнов машинного обучения по изображению контейнерной площадки.
+
+Доступные режимы:
+
+- `new_classifier_nodino` - YOLO + классификатор кропа + классификатор полного изображения.
+- `sam` - YOLO + SAM-based сегментация.
+- `smp` - YOLO + Segmentation Models PyTorch.
+
+## Быстрый запуск
 
 ```powershell
 python -m venv .venv
 .venv\Scripts\Activate.ps1
-pip install -r requirements.txt
-python -m pipeline.debug
+pip install -r fastapi_app\requirements.txt
+uvicorn fastapi_app.main:app --reload
 ```
 
-Перед запуском положите файлы весов `pipeline/yolo_source.pt` и `pipeline/best_resnet_kgo.pth` в папку `pipeline/`
-или задайте пути через переменные окружения `KGO_YOLO_CHECKPOINT` и `KGO_CLASSIFIER_CHECKPOINT`.
+После запуска откройте `http://127.0.0.1:8000`.
 
-`pipeline.debug` сейчас запускает простой smoke-test пайплайна через `process_images(...)` и печатает результат в консоль.
+API endpoint:
 
-## Подготовка датасета
+```text
+POST /api/predict
+```
 
-Скрипт берёт `.zip`-архивы Datumaro из папки `datasets` и сохраняет кропы в `datasetCreation/cropped_datumaro`:
+Form-data:
+
+- `image` - файл изображения.
+- `pipeline` - один из `new_classifier_nodino`, `sam`, `smp`.
+
+## Модельные веса
+
+Файлы `.pt` и `.pth` не хранятся в основном репозитории. Приложение скачивает их при первом запуске выбранного пайплайна из GitHub Releases отдельного репозитория:
+
+```text
+https://github.com/likip3/AI_Models/releases/tag/v1
+```
+
+Ожидаемые release assets:
+
+- `Yolo26s_kgo.pt`
+- `best_efficientnet_v2_s_kgo.pth`
+- `best_efficientnet_for_full.pth`
+- `sam_model.pth`
+- `best_model_SMP.pth`
+
+Настройки по умолчанию:
 
 ```powershell
-python datasetCreation\prepare_datumaro_dataset.py --clear-output
+$env:KGO_MODEL_REPO = "likip3/AI_Models"
+$env:KGO_MODEL_RELEASE_TAG = "v1"
+$env:KGO_MODEL_CACHE_DIR = ".model_cache"
 ```
 
-Основные аргументы:
-- `--datasets-dir` - папка с `.zip`-архивами Datumaro, по умолчанию `datasets`
-- `--output-dir` - куда сохранять кропы и `summary.json`, по умолчанию `datasetCreation/cropped_datumaro`
-- `--archives` - список конкретных архивов для обработки
-- `--clear-output` - очистить старые `.jpg` в папках классов перед генерацией
-
-Пример:
+Для private repository можно передать токен:
 
 ```powershell
-python datasetCreation\prepare_datumaro_dataset.py --datasets-dir datasets --output-dir datasetCreation\cropped_datumaro --clear-output
+$env:KGO_MODEL_AUTH_TOKEN = "<github-token>"
 ```
 
-## Обучение классификаторов
+Каждый checkpoint можно переопределить локальным путём или прямым URL:
 
-Обучение запускается на датасете из `datasetCreation/cropped_datumaro`, результаты сохраняются в `artifacts/classification`:
+- `KGO_NCD_YOLO_CHECKPOINT`, `KGO_NCD_YOLO_URL`
+- `KGO_NCD_CROP_CLASSIFIER_CHECKPOINT`, `KGO_NCD_CROP_CLASSIFIER_URL`
+- `KGO_NCD_FULL_CLASSIFIER_CHECKPOINT`, `KGO_NCD_FULL_CLASSIFIER_URL`
+- `KGO_SAM_YOLO_CHECKPOINT`, `KGO_SAM_YOLO_URL`
+- `KGO_SAM_CHECKPOINT`, `KGO_SAM_URL`
+- `KGO_SMP_YOLO_CHECKPOINT`, `KGO_SMP_YOLO_URL`
+- `KGO_SMP_CHECKPOINT`, `KGO_SMP_URL`
+
+## Docker
+
+Сборка образа:
 
 ```powershell
-python datasetCreation\train_classifiers.py
+docker build -t project-urfu-2026 .
 ```
 
-Основные аргументы:
-- `--dataset-root` - папка с подготовленными изображениями классов, по умолчанию `datasetCreation/cropped_datumaro`
-- `--output-dir` - куда сохранять чекпоинты и метрики, по умолчанию `artifacts/classification`
-- `--models` - список моделей для обучения, по умолчанию `efficientnet_v2_s convnext_tiny`
-- `--epochs` - число эпох, по умолчанию `30`
-- `--batch-size` - размер батча, по умолчанию `16`
-- `--learning-rate` - learning rate, по умолчанию `1e-4`
-- `--weight-decay` - weight decay, по умолчанию `1e-5`
-- `--num-workers` - число worker-процессов DataLoader, по умолчанию `0`
-- `--early-stop-patience` - patience для early stopping, по умолчанию `4`
-- `--seed` - random seed, по умолчанию `42`
-- `--no-pretrained` - отключить предобученные веса backbone
-
-Пример:
+Запуск:
 
 ```powershell
-python datasetCreation\train_classifiers.py --models resnet50 efficientnet_v2_s --epochs 20 --batch-size 8
+docker run --rm -p 8000:8000 `
+  -e KGO_MODEL_REPO=likip3/AI_Models `
+  -e KGO_MODEL_RELEASE_TAG=v1 `
+  project-urfu-2026
 ```
 
-Ключевые метрики классификатора сохраняются в `artifacts/classification/metrics_<model>.json` и `artifacts/classification/leaderboard.json`.
-Там есть как минимум `accuracy`, `macro_f1`, `roc_auc`, номер лучшей эпохи и размеры train/val/test split.
+После запуска приложение доступно на `http://127.0.0.1:8000`.
 
-## Проверка пайплайна и метрик
+## CI/CD
 
-- Для быстрой проверки запуска всего пайплайна используйте `python -m pipeline.debug`
-- Для расчёта численных метрик в текущем репозитории используется `python datasetCreation\train_classifiers.py`
-- Отдельного скрипта для end-to-end метрик всего пайплайна `YOLO + classifier` сейчас в репозитории нет
+Workflow `.github/workflows/ci.yml` выполняет:
+
+- unit tests через `pytest`;
+- проверку PEP8/runtime-кода через `ruff`;
+- сборку Docker image;
+- публикацию Docker image в Docker Hub при наличии repository secrets:
+  `DOCKERHUB_USERNAME` и `DOCKERHUB_TOKEN`.
+
+Имя публикуемого образа:
+
+```text
+DOCKERHUB_USERNAME/project-urfu-2026
+```
+
+## Проверки локально
+
+```powershell
+python -m ruff check fastapi_app pipeline/classifier_models.py pipeline/pipeline.py predict_image.py NewClassificatorNoDino/pipeline.py SAM_model/pipeline.py SMP_model/pipeline.py tests
+python -m pytest -q
+```
+
+## Подготовка датасета и обучение
+
+Скрипты подготовки датасета и обучения сохранены в `datasetCreation`, `NewClassificatorNoDino`, `SAM_model` и `SMP_model`.
+Они не требуются для запуска Web/API приложения, но оставлены в репозитории как исследовательская и training-часть проекта.

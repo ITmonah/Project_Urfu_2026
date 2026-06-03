@@ -9,6 +9,13 @@ from typing import Any
 
 from PIL import Image, ImageDraw, ImageFont
 
+from fastapi_app.model_assets import (
+    ModelAssetSpec,
+    ensure_model_asset,
+    model_asset_status,
+    resolve_model_asset_path,
+)
+
 
 ROOT_DIR = Path(__file__).resolve().parents[1]
 os.environ.setdefault("NO_ALBUMENTATIONS_UPDATE", "1")
@@ -22,6 +29,17 @@ class CheckpointSpec:
     label: str
     env_var: str
     default_path: Path
+    asset_name: str
+    url_env_var: str
+
+    def to_model_asset(self) -> ModelAssetSpec:
+        return ModelAssetSpec(
+            label=self.label,
+            path_env_var=self.env_var,
+            default_path=self.default_path,
+            asset_name=self.asset_name,
+            url_env_var=self.url_env_var,
+        )
 
 
 @dataclass(frozen=True)
@@ -38,16 +56,26 @@ PIPELINE_SPECS: tuple[PipelineSpec, ...] = (
         label="NewClassificatorNoDino",
         description="YOLO + классификатор, включая классификатор по полному изображению.",
         checkpoints=(
-            CheckpointSpec("YOLO", "KGO_NCD_YOLO_CHECKPOINT", ROOT_DIR / "NewClassificatorNoDino" / "Yolo26s_kgo.pt"),
+            CheckpointSpec(
+                "YOLO",
+                "KGO_NCD_YOLO_CHECKPOINT",
+                ROOT_DIR / "NewClassificatorNoDino" / "Yolo26s_kgo.pt",
+                "Yolo26s_kgo.pt",
+                "KGO_NCD_YOLO_URL",
+            ),
             CheckpointSpec(
                 "Crop classifier",
                 "KGO_NCD_CROP_CLASSIFIER_CHECKPOINT",
                 ROOT_DIR / "NewClassificatorNoDino" / "best_efficientnet_v2_s_kgo.pth",
+                "best_efficientnet_v2_s_kgo.pth",
+                "KGO_NCD_CROP_CLASSIFIER_URL",
             ),
             CheckpointSpec(
                 "Full image classifier",
                 "KGO_NCD_FULL_CLASSIFIER_CHECKPOINT",
                 ROOT_DIR / "NewClassificatorNoDino" / "best_efficientnet_for_full.pth",
+                "best_efficientnet_for_full.pth",
+                "KGO_NCD_FULL_CLASSIFIER_URL",
             ),
         ),
     ),
@@ -56,8 +84,20 @@ PIPELINE_SPECS: tuple[PipelineSpec, ...] = (
         label="SAM_model",
         description="Foundation SAM segmentation pipeline.",
         checkpoints=(
-            CheckpointSpec("YOLO", "KGO_SAM_YOLO_CHECKPOINT", ROOT_DIR / "SAM_model" / "Yolo26s_kgo.pt"),
-            CheckpointSpec("SAM", "KGO_SAM_CHECKPOINT", ROOT_DIR / "SAM_model" / "sam_model.pth"),
+            CheckpointSpec(
+                "YOLO",
+                "KGO_SAM_YOLO_CHECKPOINT",
+                ROOT_DIR / "SAM_model" / "Yolo26s_kgo.pt",
+                "Yolo26s_kgo.pt",
+                "KGO_SAM_YOLO_URL",
+            ),
+            CheckpointSpec(
+                "SAM",
+                "KGO_SAM_CHECKPOINT",
+                ROOT_DIR / "SAM_model" / "sam_model.pth",
+                "sam_model.pth",
+                "KGO_SAM_URL",
+            ),
         ),
     ),
     PipelineSpec(
@@ -65,8 +105,20 @@ PIPELINE_SPECS: tuple[PipelineSpec, ...] = (
         label="SMP_model",
         description="Segmentation Models PyTorch pipeline.",
         checkpoints=(
-            CheckpointSpec("YOLO", "KGO_SMP_YOLO_CHECKPOINT", ROOT_DIR / "SMP_model" / "Yolo26s_kgo.pt"),
-            CheckpointSpec("SMP", "KGO_SMP_CHECKPOINT", ROOT_DIR / "SMP_model" / "best_model_SMP.pth"),
+            CheckpointSpec(
+                "YOLO",
+                "KGO_SMP_YOLO_CHECKPOINT",
+                ROOT_DIR / "SMP_model" / "Yolo26s_kgo.pt",
+                "Yolo26s_kgo.pt",
+                "KGO_SMP_YOLO_URL",
+            ),
+            CheckpointSpec(
+                "SMP",
+                "KGO_SMP_CHECKPOINT",
+                ROOT_DIR / "SMP_model" / "best_model_SMP.pth",
+                "best_model_SMP.pth",
+                "KGO_SMP_URL",
+            ),
         ),
     ),
 )
@@ -92,7 +144,7 @@ def resolve_path(path_value: str | Path) -> Path:
 
 
 def resolve_checkpoint(spec: CheckpointSpec) -> Path:
-    return resolve_path(os.getenv(spec.env_var, spec.default_path))
+    return resolve_model_asset_path(spec.to_model_asset())
 
 
 def get_pipeline_spec(pipeline_name: str) -> PipelineSpec:
@@ -107,28 +159,15 @@ def get_pipeline_spec(pipeline_name: str) -> PipelineSpec:
 def pipeline_checkpoints(spec: PipelineSpec) -> list[dict[str, Any]]:
     checkpoints = []
     for checkpoint in spec.checkpoints:
-        path = resolve_checkpoint(checkpoint)
-        checkpoints.append(
-            {
-                "label": checkpoint.label,
-                "env_var": checkpoint.env_var,
-                "path": str(path),
-                "available": path.exists(),
-            }
-        )
+        checkpoints.append(model_asset_status(checkpoint.to_model_asset()))
     return checkpoints
 
 
 def ensure_checkpoints(spec: PipelineSpec) -> dict[str, Path]:
-    resolved = {checkpoint.env_var: resolve_checkpoint(checkpoint) for checkpoint in spec.checkpoints}
-    missing = [
-        f"{checkpoint.label}: {resolved[checkpoint.env_var]}"
+    return {
+        checkpoint.env_var: ensure_model_asset(checkpoint.to_model_asset())
         for checkpoint in spec.checkpoints
-        if not resolved[checkpoint.env_var].exists()
-    ]
-    if missing:
-        raise FileNotFoundError("Missing checkpoint(s): " + "; ".join(missing))
-    return resolved
+    }
 
 
 def list_available_pipelines() -> list[dict[str, Any]]:
@@ -198,8 +237,10 @@ def normalize_result(
             {
                 "label": checkpoint.label,
                 "env_var": checkpoint.env_var,
+                "url_env_var": checkpoint.url_env_var,
                 "path": str(checkpoints[checkpoint.env_var]),
                 "available": checkpoints[checkpoint.env_var].exists(),
+                "source_url": model_asset_status(checkpoint.to_model_asset())["source_url"],
             }
             for checkpoint in spec.checkpoints
         ],

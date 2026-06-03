@@ -1,7 +1,12 @@
 import os
-import sys
 import logging
 import warnings
+
+import torch
+import torchvision.transforms as transforms
+from PIL import Image
+from torchvision.models import efficientnet_v2_s
+from ultralytics import YOLO
 
 warnings.filterwarnings('ignore')
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
@@ -13,12 +18,6 @@ logging.getLogger('ultralytics').setLevel(logging.CRITICAL)
 logging.getLogger('transformers').setLevel(logging.CRITICAL)
 
 logging.getLogger('torch').setLevel(logging.CRITICAL)
-
-import torch
-from PIL import Image
-from ultralytics import YOLO
-import torchvision.transforms as transforms
-from torchvision.models import efficientnet_v2_s
 
 YOLO_PATH = "Yolo26s_kgo.pt"
 CLS_PATH = "best_efficientnet_v2_s_kgo.pth"
