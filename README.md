@@ -54,12 +54,6 @@ $env:KGO_MODEL_RELEASE_TAG = "v1"
 $env:KGO_MODEL_CACHE_DIR = ".model_cache"
 ```
 
-Для private repository можно передать токен:
-
-```powershell
-$env:KGO_MODEL_AUTH_TOKEN = "<github-token>"
-```
-
 Каждый checkpoint можно переопределить локальным путём или прямым URL:
 
 - `KGO_NCD_YOLO_CHECKPOINT`, `KGO_NCD_YOLO_URL`
@@ -103,13 +97,6 @@ Workflow `.github/workflows/ci.yml` выполняет:
 
 ```text
 DOCKERHUB_USERNAME/project-urfu-2026
-```
-
-## Проверки локально
-
-```powershell
-python -m ruff check fastapi_app pipeline/classifier_models.py pipeline/pipeline.py predict_image.py NewClassificatorNoDino/pipeline.py SAM_model/pipeline.py SMP_model/pipeline.py tests
-python -m pytest -q
 ```
 
 ## Подготовка датасета и обучение
