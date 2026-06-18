@@ -11,6 +11,9 @@ extend-exclude = [
 ]
 
 [tool.pytest.ini_options]
-addopts = "--basetemp=.pytest_tmp"
+addopts = "--basetemp=.pytest_tmp -m 'not data_quality'"
 testpaths = ["tests"]
 pythonpath = ["."]
+markers = [
+    "data_quality: checks dataset archives and annotation consistency; requires DVC data to be pulled",
+]

@@ -30,6 +30,18 @@ def test_resolves_missing_asset_to_cache(monkeypatch, tmp_path):
     assert path == tmp_path / "cache" / "model.pt"
 
 
+def test_existing_default_checkpoint_is_used_before_cache(monkeypatch, tmp_path):
+    monkeypatch.delenv("KGO_TEST_CHECKPOINT", raising=False)
+    monkeypatch.setenv("KGO_MODEL_CACHE_DIR", str(tmp_path / "cache"))
+    default_path = tmp_path / "dvc" / "model.pt"
+    default_path.parent.mkdir()
+    default_path.write_bytes(b"model")
+
+    path = model_assets.resolve_model_asset_path(make_spec(default_path))
+
+    assert path == default_path
+
+
 def test_builds_github_release_url(monkeypatch, tmp_path):
     monkeypatch.delenv("KGO_TEST_URL", raising=False)
     monkeypatch.delenv("KGO_MODEL_ASSETS_BASE_URL", raising=False)

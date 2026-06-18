@@ -112,7 +112,18 @@ docker run --rm -p 8000:8000 `
 
 ## CI/CD
 
-Workflow `.github/workflows/ci.yml` выполняет:
+Основной CI/CD-конвейер проекта описан в `Jenkinsfile`. Он выполняет:
+
+- unit tests через `pytest`;
+- проверку PEP8/runtime-кода через `ruff`;
+- `dvc pull` для датасетов и весов моделей;
+- data quality tests через `pytest -m data_quality`;
+- сборку Docker image;
+- публикацию Docker image в Docker Hub для `main` и tag builds.
+
+Обучение моделей в конвейере не запускается. Подробная MLOps-документация находится в `docs/MLOPS.md`.
+
+Дополнительно сохранен workflow `.github/workflows/ci.yml`, который выполняет:
 
 - unit tests через `pytest`;
 - проверку PEP8/runtime-кода через `ruff`;
@@ -124,6 +135,22 @@ Workflow `.github/workflows/ci.yml` выполняет:
 
 ```text
 DOCKERHUB_USERNAME/project-urfu-2026
+```
+
+## DVC
+
+Датасеты и доступные локально веса моделей версионируются через DVC:
+
+- `datasets.dvc`;
+- `model_weights.dvc`.
+
+Удаленное хранилище по умолчанию: `s3://project-urfu-2026-dvc`.
+
+Для локального восстановления данных:
+
+```powershell
+pip install "dvc[s3]"
+dvc pull datasets.dvc model_weights.dvc
 ```
 
 ## Подготовка датасета и обучение

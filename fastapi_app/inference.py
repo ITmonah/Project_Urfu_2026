@@ -22,6 +22,7 @@ os.environ.setdefault("NO_ALBUMENTATIONS_UPDATE", "1")
 ULTRALYTICS_CONFIG_DIR = ROOT_DIR / ".tmp" / "ultralytics"
 ULTRALYTICS_CONFIG_DIR.mkdir(parents=True, exist_ok=True)
 os.environ.setdefault("YOLO_CONFIG_DIR", str(ULTRALYTICS_CONFIG_DIR))
+DVC_YOLO_PATH = ROOT_DIR / "SMP_model" / "Yolo26s_kgo.pt"
 
 
 @dataclass(frozen=True)
@@ -59,14 +60,14 @@ PIPELINE_SPECS: tuple[PipelineSpec, ...] = (
             CheckpointSpec(
                 "YOLO",
                 "KGO_NCD_YOLO_CHECKPOINT",
-                ROOT_DIR / "NewClassificatorNoDino" / "Yolo26s_kgo.pt",
+                DVC_YOLO_PATH,
                 "Yolo26s_kgo.pt",
                 "KGO_NCD_YOLO_URL",
             ),
             CheckpointSpec(
                 "Crop classifier",
                 "KGO_NCD_CROP_CLASSIFIER_CHECKPOINT",
-                ROOT_DIR / "NewClassificatorNoDino" / "best_efficientnet_v2_s_kgo.pth",
+                ROOT_DIR / "artifacts" / "classification" / "best_efficientnet_v2_s_kgo.pth",
                 "best_efficientnet_v2_s_kgo.pth",
                 "KGO_NCD_CROP_CLASSIFIER_URL",
             ),
@@ -87,7 +88,7 @@ PIPELINE_SPECS: tuple[PipelineSpec, ...] = (
             CheckpointSpec(
                 "YOLO",
                 "KGO_SAM_YOLO_CHECKPOINT",
-                ROOT_DIR / "SAM_model" / "Yolo26s_kgo.pt",
+                DVC_YOLO_PATH,
                 "Yolo26s_kgo.pt",
                 "KGO_SAM_YOLO_URL",
             ),

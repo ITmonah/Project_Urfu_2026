@@ -1,0 +1,25 @@
+outs:
+- md5: 4a225ea98ffb68d1012e3b66c183d274
+  size: 111345111
+  hash: md5
+  path: artifacts/classification/best_convnext_tiny_kgo.pth
+- md5: bfc972053706a3d5529d1aba3b7a4c63
+  size: 81590623
+  hash: md5
+  path: artifacts/classification/best_efficientnet_v2_s_kgo.pth
+- md5: 15b4d5af304c8ecc698471cb1cd2d960
+  size: 94359867
+  hash: md5
+  path: artifacts/classification/best_resnet50_kgo.pth
+- md5: 23edc0e17b5239e79e8ba10981118344
+  size: 152957386
+  hash: md5
+  path: pipeline/yolo_source.pt
+- md5: 507120e2bfab54445baa44ea2ecae1e8
+  size: 20275077
+  hash: md5
+  path: SMP_model/Yolo26s_kgo.pt
+- md5: c3f1d89449ece602b705aac60cc7dda1
+  size: 344848629
+  hash: md5
+  path: SMP_model/best_model_SMP.pth

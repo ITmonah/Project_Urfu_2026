@@ -1,0 +1,8 @@
+# Add files or directories to skip when DVC traverses the workspace.
+.git
+.venv
+.pytest_cache
+.pytest_tmp
+.ruff_cache
+.model_cache
+__pycache__

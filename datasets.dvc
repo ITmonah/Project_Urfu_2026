@@ -1,0 +1,13 @@
+outs:
+- md5: d0d7aed03ea21a4ec9785f7c15cb791a
+  size: 1622299864
+  hash: md5
+  path: datasets/39.zip
+- md5: 733118e0667a3891e46989be91986b99
+  size: 196099416
+  hash: md5
+  path: datasets/40.zip
+- md5: f4d6991fca92beb1be3503507e9f1b08
+  size: 128548663
+  hash: md5
+  path: datasets/42.zip

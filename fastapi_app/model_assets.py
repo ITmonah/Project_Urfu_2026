@@ -55,6 +55,10 @@ def resolve_model_asset_path(spec: ModelAssetSpec) -> Path:
     if env_path:
         return resolve_path(env_path)
 
+    default_path = resolve_path(spec.default_path)
+    if default_path.exists():
+        return default_path
+
     return model_cache_dir() / spec.asset_name
 
 

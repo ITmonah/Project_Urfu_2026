@@ -1,4 +1,5 @@
 fastapi
+dvc[s3]
 httpx
 jinja2
 pillow
