@@ -1,3 +1,4 @@
+# Импорт необходимых библиотек
 import os
 import numpy as np
 import cv2
@@ -9,15 +10,17 @@ import albumentations as A
 from albumentations.pytorch import ToTensorV2
 from segment_anything import sam_model_registry
 
-
+# Пути к файлам моделей
 YOLO_PATH = "Yolo26s_kgo.pt"
 SAM_FULL_MODEL_PATH = "sam_model.pth"
 
+# Числовые метки классов для семантической сегментации
 BACKGROUND = 0
 FLOOR = 1
 WALL = 2
 GARBAGE = 3
 
+# Порог заполнения платформы мусором (в долях от 1)
 DEFAULT_THRESHOLD = 0.70
 
 
@@ -25,10 +28,12 @@ class SAMSemanticMulticlass(nn.Module):
 
     def __init__(self, sam_base, num_classes=4):
         super().__init__()
+        # Используем предобученный энкодер SAM без возможности обучения
         self.image_encoder = sam_base.image_encoder
         for param in self.image_encoder.parameters():
             param.requires_grad = False
 
+        # Простой декодер из транспонированных свёрток для получения карты классов
         self.decoder = nn.Sequential(
             nn.ConvTranspose2d(256, 128, kernel_size=2, stride=2),
             nn.BatchNorm2d(128), nn.ReLU(inplace=True),
@@ -42,15 +47,17 @@ class SAMSemanticMulticlass(nn.Module):
         )
 
     def forward(self, x):
+        # Прямой проход: энкодер, затем декодер
         features = self.image_encoder(x)
         logits = self.decoder(features)
+        # Приводим к исходному размеру 1024x1024, который используется при обучении
         logits = torch.nn.functional.interpolate(
             logits, size=(1024, 1024), mode='bilinear', align_corners=False
         )
         return logits
 
 
-
+# Глобальные переменные для хранения загруженных моделей и настроек
 det_model = None
 segment_model = None
 device = None
@@ -67,26 +74,29 @@ def _check_models_loaded():
 
 def load_models(yolo_path=YOLO_PATH, sam_path=SAM_FULL_MODEL_PATH):
     global det_model, segment_model, device, transform
-
+    
+# Проверка наличия файлов
     if not os.path.exists(yolo_path):
         raise FileNotFoundError(f"YOLO model not found: {yolo_path}")
     if not os.path.exists(sam_path):
         raise FileNotFoundError(f"SAM model not found: {sam_path}")
 
+    # Определение устройства
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
     print(f"DEVICE: {device}")
 
-    # YOLO
+    # Загрузка детектора YOLO
     det_model = YOLO(yolo_path)
     det_model.to(device)
 
-    # SAM
+    # Загрузка модели сегментации на базе SAM
     sam_base = sam_model_registry['vit_b'](checkpoint=None)
     segment_model = SAMSemanticMulticlass(sam_base, num_classes=4).to(device)
     state_dict = torch.load(sam_path, map_location=device)
     segment_model.load_state_dict(state_dict)
     segment_model.eval()
 
+    # Преобразования для приведения изображения к формату, ожидаемому моделью
     transform = A.Compose([
         A.LongestMaxSize(max_size=1024),
         A.PadIfNeeded(min_height=1024, min_width=1024,
@@ -104,20 +114,25 @@ def predict_with_tta(input_tensor):
         with torch.no_grad():
             return segment_model(t)
 
+    # Оригинальное изображение
     predictions.append(_infer(input_tensor))
 
+    # Отражение по горизонтали
     flipped_h = torch.flip(input_tensor, dims=[3])
     pred_h = _infer(flipped_h)
     predictions.append(torch.flip(pred_h, dims=[3]))
 
+    # Отражение по вертикали
     flipped_v = torch.flip(input_tensor, dims=[2])
     pred_v = _infer(flipped_v)
     predictions.append(torch.flip(pred_v, dims=[2]))
 
+    # Поворот на 90 градусов
     rotated_90 = torch.rot90(input_tensor, k=1, dims=[2, 3])
     pred_r90 = _infer(rotated_90)
     predictions.append(torch.rot90(pred_r90, k=-1, dims=[2, 3]))
 
+    # Усреднение по всем вариантам
     return torch.mean(torch.stack(predictions), dim=0)
 
 
@@ -126,16 +141,20 @@ def segment_kgp(image_bgr):
     h, w = image_bgr.shape[:2]
     image_rgb = cv2.cvtColor(image_bgr, cv2.COLOR_BGR2RGB)
 
+    # Преобразование и подготовка тензора
     transformed = transform(image=image_rgb)
     input_tensor = transformed['image'].unsqueeze(0).to(device)
 
+    # Получение логитов с помощью TTA
     logits = predict_with_tta(input_tensor)
     pred_map = torch.argmax(logits, dim=1).squeeze(0).cpu().numpy()
 
+    # Масштабирование предсказания до исходного размера
     pred_resized = cv2.resize(
         pred_map.astype(np.uint8), (w, h),
         interpolation=cv2.INTER_NEAREST
     )
+    # Маска только для класса GARBAGE
     waste_mask = (pred_resized == GARBAGE).astype(np.uint8) * 255
     return pred_resized, waste_mask
 
@@ -143,16 +162,20 @@ def segment_kgp(image_bgr):
 
 def clean_garbage_mask(garbage_mask, platform_area, min_component_ratio=0.0005):
     h, w = garbage_mask.shape[:2]
+    # Размер ядра адаптивно зависит от размера изображения
     k = max(3, min(15, int(min(h, w) * 0.005) | 1))
     kernel = np.ones((k, k), np.uint8)
 
+    # Закрытие для заполнения маленьких разрывов
     closed = cv2.morphologyEx(garbage_mask, cv2.MORPH_CLOSE, kernel)
 
+    # Поиск связных компонентов
     num_labels, labels, stats, _ = cv2.connectedComponentsWithStats(
         closed, connectivity=8
     )
     cleaned_mask = np.zeros_like(closed)
 
+    # Минимальная площадь компонента в пикселях
     min_area = max(1, platform_area * min_component_ratio)
     for i in range(1, num_labels):
         if stats[i, cv2.CC_STAT_AREA] >= min_area:
@@ -163,12 +186,18 @@ def clean_garbage_mask(garbage_mask, platform_area, min_component_ratio=0.0005):
 
 def calculate_fill_percentage(image_bgr, threshold=DEFAULT_THRESHOLD,
                                min_component_ratio=0.0005):
+    # Основная функция расчёта заполненности платформы.
+    # Возвращает словарь с процентом, меткой ('kgo_full' или 'kgo_empty'),
+    # очищенной маской мусора и картой классов.
 
+    # Получаем предсказанную карту и сырую маску мусора
     pred_map, _ = segment_kgp(image_bgr)
 
+    # Маска платформы (пол + стены)
     platform_mask = ((pred_map == FLOOR) | (pred_map == WALL)).astype(np.uint8)
     platform_area = int(np.sum(platform_mask))
 
+    # Если платформа не обнаружена – возвращаем нулевой результат
     if platform_area == 0:
         return {
             'percentage': 0.0,
@@ -177,14 +206,17 @@ def calculate_fill_percentage(image_bgr, threshold=DEFAULT_THRESHOLD,
             'pred_map': pred_map
         }
 
+    # Очистка маски мусора от шумов
     garbage_mask_raw = (pred_map == GARBAGE).astype(np.uint8)
     garbage_mask = clean_garbage_mask(
         garbage_mask_raw, platform_area, min_component_ratio
     )
 
     garbage_area = int(np.sum(garbage_mask))
+    # Процент заполнения, ограниченный 100%
     percentage = min(100.0, (garbage_area / platform_area) * 100.0)
 
+    # Определение метки на основе порога
     label = 'kgo_full' if percentage >= threshold * 100.0 else 'kgo_empty'
 
     return {
@@ -196,17 +228,23 @@ def calculate_fill_percentage(image_bgr, threshold=DEFAULT_THRESHOLD,
 
 
 def detect_platform(pil_img):
+    # Обнаруживает платформу на изображении PIL с помощью YOLO.
+    # Возвращает координаты ограничивающего прямоугольника с небольшим отступом (pad).
+    # Если платформа не найдена – возвращает None.
     _check_models_loaded()
 
+    # Инференс YOLO
     results = det_model(pil_img, verbose=False)
     if results[0].boxes is None or len(results[0].boxes) == 0:
         return None
 
+    # Поиск класса 'kgo_platform'
     names = results[0].names
     target_id = next((i for i, n in names.items() if n == 'kgo_platform'), None)
     if target_id is None:
         return None
 
+    # Выбираем бокс с максимальной уверенностью среди подходящих
     best_box = max(
         (b for b in results[0].boxes if int(b.cls[0]) == target_id),
         key=lambda b: float(b.conf[0]),
@@ -217,6 +255,7 @@ def detect_platform(pil_img):
 
     x1, y1, x2, y2 = map(int, best_box.xyxy[0].tolist())
 
+    # Добавляем 8% отступа со всех сторон для более полного охвата
     pad = 0.08
     bw, bh = x2 - x1, y2 - y1
     x1 = max(0, int(x1 - bw * pad))
@@ -228,6 +267,8 @@ def detect_platform(pil_img):
 
 
 def process_image(image_path, threshold=DEFAULT_THRESHOLD):
+    # Упрощённая обработка изображения: возвращает только метку ('kgo_full' или 'kgo_empty').
+    # Предполагается, что модели уже загружены.
     _check_models_loaded()
 
     pil_img = Image.open(image_path).convert('RGB')
@@ -245,8 +286,11 @@ def process_image(image_path, threshold=DEFAULT_THRESHOLD):
 
 def process_and_visualize(image_path, output_dir=None, show_full=True,
                           show_crop=True, threshold=DEFAULT_THRESHOLD):
+    # Полная обработка с визуализацией результатов.
+    # Возвращает словарь с меткой, процентом, маской и путями к сохранённым изображениям.
     _check_models_loaded()
 
+    # Загрузка и обнаружение платформы
     pil_img = Image.open(image_path).convert('RGB')
     box = detect_platform(pil_img)
     if box is None:
@@ -256,27 +300,34 @@ def process_and_visualize(image_path, output_dir=None, show_full=True,
     crop_pil = pil_img.crop((x1, y1, x2, y2))
     crop_bgr = cv2.cvtColor(np.array(crop_pil), cv2.COLOR_RGB2BGR)
 
+    # Расчёт заполненности
     result = calculate_fill_percentage(crop_bgr, threshold=threshold)
     percentage = result['percentage']
     label = result['label']
     waste_mask = result['mask']
-
+ 
+    # Визуализация на полном изображении
     full_img = pil_img.copy()
     draw = ImageDraw.Draw(full_img)
+    # Рисуем красный прямоугольник вокруг платформы
     draw.rectangle([x1, y1, x2, y2], outline='red', width=5)
 
+    # Текст с результатом
     text = f"{percentage:.1f}% - {label}"
     try:
         font = ImageFont.truetype("arial.ttf", 28)
     except (IOError, OSError):
         font = ImageFont.load_default()
 
+    # Размещаем текст над прямоугольником
     tw, th = draw.textbbox((0, 0), text, font=font)[2:]
     tx, ty = x1, max(0, y1 - th - 15)
     draw.rectangle([tx, ty, tx + tw + 20, ty + th + 10], fill='black')
     draw.text((tx + 10, ty + 5), text, fill='white', font=font)
 
+    # Визуализация на кропе платформы
     crop_vis = crop_bgr.copy()
+    # Накладываем красную полупрозрачную маску на области мусора
     red_overlay = np.zeros_like(crop_vis)
     red_overlay[waste_mask > 0] = [0, 0, 255]
     crop_vis = cv2.addWeighted(crop_vis, 1.0, red_overlay, 0.45, 0)
@@ -286,6 +337,7 @@ def process_and_visualize(image_path, output_dir=None, show_full=True,
     crop_rgb = cv2.cvtColor(crop_vis, cv2.COLOR_BGR2RGB)
     crop_pil_vis = Image.fromarray(crop_rgb)
 
+    # Сохранение изображений, если указана выходная директория
     full_img_path = None
     crop_img_path = None
     if output_dir:
@@ -295,6 +347,7 @@ def process_and_visualize(image_path, output_dir=None, show_full=True,
         full_img.save(full_img_path)
         crop_pil_vis.save(crop_img_path)
 
+    # Отображение, если запрошено
     if show_full:
         full_img.show()
     if show_crop:
