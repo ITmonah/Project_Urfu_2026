@@ -22,6 +22,7 @@ venv
 *.pt
 *.7z
 report3.txt
+reports/
 
 *__pycache__/
 *.log
