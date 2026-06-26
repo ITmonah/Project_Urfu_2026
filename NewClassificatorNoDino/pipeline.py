@@ -1,9 +1,13 @@
 import os
-import sys
 import logging
 import warnings
 
-# Отключаем предупреждения, чтобы не засорять вывод
+import torch
+import torchvision.transforms as transforms
+from PIL import Image
+from torchvision.models import efficientnet_v2_s
+from ultralytics import YOLO
+
 warnings.filterwarnings('ignore')
 
 # Настройка уровня логирования библиотек 
@@ -17,13 +21,6 @@ logging.getLogger('transformers').setLevel(logging.CRITICAL) # Transformers - т
 
 logging.getLogger('torch').setLevel(logging.CRITICAL) # PyTorch - только критические
 
-import torch
-from PIL import Image
-from ultralytics import YOLO
-import torchvision.transforms as transforms
-from torchvision.models import efficientnet_v2_s
-
-# Пути к файлам моделей
 YOLO_PATH = "Yolo26s_kgo.pt"
 CLS_PATH = "best_efficientnet_v2_s_kgo.pth"
 FULL_CLS_PATH = "best_efficientnet_for_full.pth"

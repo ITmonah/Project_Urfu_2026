@@ -10,14 +10,34 @@
 
 ```powershell
 pip install -r fastapi_app\requirements.txt
-uvicorn fastapi_app.main:app --reload
+python -m fastapi_app.run
 ```
 
 После запуска откройте `http://127.0.0.1:8000`.
 
+Для HTTPS передайте сертификат и ключ:
+
+```powershell
+$env:KGO_SSL_CERTFILE = "C:\certs\localhost.crt"
+$env:KGO_SSL_KEYFILE = "C:\certs\localhost.key"
+python -m fastapi_app.run
+```
+
+С сертификатом приложение открывается на `https://127.0.0.1:8443`, а `http://127.0.0.1:8000` отвечает redirect на HTTPS с кодом `308`.
+
 ## Checkpoints
 
-По умолчанию приложение ищет веса внутри папок пайплайнов. Пути можно переопределить через переменные окружения:
+Файлы `.pt` и `.pth` должны храниться в отдельном репозитории с GitHub Releases.
+По умолчанию приложение скачивает недостающие веса из `likip3/AI-Models`, release tag `v1`, и кеширует их в `.model_cache`.
+
+Общие настройки:
+
+- `KGO_MODEL_REPO` - по умолчанию `likip3/AI-Models`
+- `KGO_MODEL_RELEASE_TAG` - по умолчанию `v1`
+- `KGO_MODEL_CACHE_DIR` - по умолчанию `.model_cache`
+- `KGO_MODEL_AUTH_TOKEN` - optional token для private repository
+
+Пути можно переопределить через переменные окружения:
 
 - `KGO_NCD_YOLO_CHECKPOINT`
 - `KGO_NCD_CROP_CLASSIFIER_CHECKPOINT`
@@ -27,8 +47,24 @@ uvicorn fastapi_app.main:app --reload
 - `KGO_SMP_YOLO_CHECKPOINT`
 - `KGO_SMP_CHECKPOINT`
 
-Если checkpoint не найден, главная страница продолжит открываться, а запуск выбранного пайплайна вернет понятную ошибку.
-Для `SMP_model` fallback-файлы: `SMP_model/Yolo26s_kgo.pt` и `SMP_model/best_model_SMP.pth`.
+Прямые URL можно переопределить через:
+
+- `KGO_NCD_YOLO_URL`
+- `KGO_NCD_CROP_CLASSIFIER_URL`
+- `KGO_NCD_FULL_CLASSIFIER_URL`
+- `KGO_SAM_YOLO_URL`
+- `KGO_SAM_URL`
+- `KGO_SMP_YOLO_URL`
+- `KGO_SMP_URL`
+
+Если checkpoint не найден локально, приложение скачает его при запуске выбранного пайплайна.
+Главная страница продолжит открываться даже без локально скачанных весов.
+
+В Docker image включён preload:
+
+- `KGO_PRELOAD_MODEL_ASSETS=1`
+
+С этим флагом приложение скачивает все checkpoints при старте контейнера и пишет прогресс в консоль.
 
 ## API
 

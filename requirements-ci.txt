@@ -1,0 +1,7 @@
+fastapi
+httpx
+jinja2
+pillow
+pytest
+python-multipart
+ruff

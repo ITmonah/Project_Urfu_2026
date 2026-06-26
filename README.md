@@ -1,71 +1,161 @@
-## Запуск
+# KGO ML Pipeline
 
-Быстрая проверка, что пайплайн поднимается и модельные веса читаются:
+Web/API-приложение на FastAPI для запуска пайплайнов машинного обучения по изображению контейнерной площадки.
+
+Доступные режимы:
+
+- `new_classifier_nodino` - YOLO + классификатор кропа + классификатор полного изображения.
+- `sam` - YOLO + SAM-based сегментация.
+- `smp` - YOLO + Segmentation Models PyTorch.
+
+## Быстрый запуск
 
 ```powershell
 python -m venv .venv
 .venv\Scripts\Activate.ps1
-pip install -r requirements.txt
-python -m pipeline.debug
+pip install -r fastapi_app\requirements.txt
+python -m fastapi_app.run
 ```
 
-Перед запуском положите файлы весов `pipeline/yolo_source.pt` и `pipeline/best_resnet_kgo.pth` в папку `pipeline/`
-или задайте пути через переменные окружения `KGO_YOLO_CHECKPOINT` и `KGO_CLASSIFIER_CHECKPOINT`.
+После запуска откройте `http://127.0.0.1:8000`.
 
-`pipeline.debug` сейчас запускает простой smoke-test пайплайна через `process_images(...)` и печатает результат в консоль.
-
-## Подготовка датасета
-
-Скрипт берёт `.zip`-архивы Datumaro из папки `datasets` и сохраняет кропы в `datasetCreation/cropped_datumaro`:
+HTTPS включается, если передать приложению сертификат и ключ:
 
 ```powershell
-python datasetCreation\prepare_datumaro_dataset.py --clear-output
+$env:KGO_SSL_CERTFILE = "C:\certs\localhost.crt"
+$env:KGO_SSL_KEYFILE = "C:\certs\localhost.key"
+python -m fastapi_app.run
 ```
 
-Основные аргументы:
-- `--datasets-dir` - папка с `.zip`-архивами Datumaro, по умолчанию `datasets`
-- `--output-dir` - куда сохранять кропы и `summary.json`, по умолчанию `datasetCreation/cropped_datumaro`
-- `--archives` - список конкретных архивов для обработки
-- `--clear-output` - очистить старые `.jpg` в папках классов перед генерацией
+В этом режиме приложение слушает HTTPS на `https://127.0.0.1:8443`, а HTTP-запросы на `http://127.0.0.1:8000` перенаправляются на HTTPS с кодом `308`.
 
-Пример:
+API endpoint:
+
+```text
+POST /api/predict
+```
+
+Form-data:
+
+- `image` - файл изображения.
+- `pipeline` - один из `new_classifier_nodino`, `sam`, `smp`.
+
+## Модельные веса
+
+Файлы `.pt` и `.pth` не хранятся в основном репозитории. Приложение скачивает их при первом запуске выбранного пайплайна из GitHub Releases отдельного репозитория:
+
+```text
+https://github.com/likip3/AI-Models/releases/tag/v1
+```
+
+Ожидаемые release assets:
+
+- `Yolo26s_kgo.pt`
+- `best_efficientnet_v2_s_kgo.pth`
+- `best_efficientnet_for_full.pth`
+- `sam_model.pth`
+- `best_model_SMP.pth`
+
+Настройки по умолчанию:
 
 ```powershell
-python datasetCreation\prepare_datumaro_dataset.py --datasets-dir datasets --output-dir datasetCreation\cropped_datumaro --clear-output
+$env:KGO_MODEL_REPO = "likip3/AI-Models"
+$env:KGO_MODEL_RELEASE_TAG = "v1"
+$env:KGO_MODEL_CACHE_DIR = ".model_cache"
 ```
 
-## Обучение классификаторов
+Каждый checkpoint можно переопределить локальным путём или прямым URL:
 
-Обучение запускается на датасете из `datasetCreation/cropped_datumaro`, результаты сохраняются в `artifacts/classification`:
+- `KGO_NCD_YOLO_CHECKPOINT`, `KGO_NCD_YOLO_URL`
+- `KGO_NCD_CROP_CLASSIFIER_CHECKPOINT`, `KGO_NCD_CROP_CLASSIFIER_URL`
+- `KGO_NCD_FULL_CLASSIFIER_CHECKPOINT`, `KGO_NCD_FULL_CLASSIFIER_URL`
+- `KGO_SAM_YOLO_CHECKPOINT`, `KGO_SAM_YOLO_URL`
+- `KGO_SAM_CHECKPOINT`, `KGO_SAM_URL`
+- `KGO_SMP_YOLO_CHECKPOINT`, `KGO_SMP_YOLO_URL`
+- `KGO_SMP_CHECKPOINT`, `KGO_SMP_URL`
+
+## Docker
+
+Сборка образа:
 
 ```powershell
-python datasetCreation\train_classifiers.py
+docker build -t project-urfu-2026 .
 ```
 
-Основные аргументы:
-- `--dataset-root` - папка с подготовленными изображениями классов, по умолчанию `datasetCreation/cropped_datumaro`
-- `--output-dir` - куда сохранять чекпоинты и метрики, по умолчанию `artifacts/classification`
-- `--models` - список моделей для обучения, по умолчанию `efficientnet_v2_s convnext_tiny`
-- `--epochs` - количество эпох, по умолчанию `30`
-- `--batch-size` - размер батча, по умолчанию `16`
-- `--learning-rate` - learning rate, по умолчанию `1e-4`
-- `--weight-decay` - weight decay, по умолчанию `1e-5`
-- `--num-workers` - число worker-процессов DataLoader, по умолчанию `0`
-- `--early-stop-patience` - patience для early stopping, по умолчанию `4`
-- `--seed` - random seed, по умолчанию `42`
-- `--no-pretrained` - отключить предобученные веса backbone
-
-Пример:
+Запуск:
 
 ```powershell
-python datasetCreation\train_classifiers.py --models resnet50 efficientnet_v2_s --epochs 20 --batch-size 8
+docker run --rm -p 8000:8000 `
+  -e KGO_MODEL_REPO=likip3/AI-Models `
+  -e KGO_MODEL_RELEASE_TAG=v1 `
+  project-urfu-2026
 ```
 
-Ключевые метрики классификатора сохраняются в `artifacts/classification/metrics_<model>.json` и `artifacts/classification/leaderboard.json`.
-Там есть как минимум `accuracy`, `macro_f1`, `roc_auc`, номер лучшей эпохи и размеры train/val/test split.
+После запуска приложение доступно на `http://127.0.0.1:8000`.
 
-## Проверка пайплайна и метрик
+Запуск Docker с HTTPS и HTTP -> HTTPS redirect:
 
-- Для быстрой проверки запуска всего пайплайна используйте `python -m pipeline.debug`
-- Для расчёта численных метрик в текущем репозитории используется `python datasetCreation\train_classifiers.py`
-- Отдельного скрипта для end-to-end метрик всего пайплайна `YOLO + classifier` сейчас в репозитории нет
+```powershell
+docker run --rm -p 8000:8000 -p 8443:8443 `
+  -v C:\certs:/certs:ro `
+  -e KGO_SSL_CERTFILE=/certs/localhost.crt `
+  -e KGO_SSL_KEYFILE=/certs/localhost.key `
+  project-urfu-2026
+```
+
+Доступные переменные:
+
+- `KGO_SSL_CERTFILE` - путь к TLS-сертификату.
+- `KGO_SSL_KEYFILE` - путь к TLS-ключу.
+- `KGO_HTTPS_PORT` - HTTPS-порт, по умолчанию `8443`.
+- `KGO_HTTP_PORT` - HTTP-порт для редиректа, по умолчанию `8000`.
+- `KGO_HTTP_REDIRECT` - включает HTTP -> HTTPS redirect, по умолчанию `1` при наличии сертификата.
+- `KGO_FORCE_HTTPS` - включает redirect middleware для запуска за reverse proxy.
+
+В Docker image включена переменная:
+
+```text
+KGO_PRELOAD_MODEL_ASSETS=1
+```
+
+Поэтому контейнер скачивает все модельные веса в `/app/.model_cache` при старте, до начала обработки запросов.
+Прогресс скачивания пишется в консоль контейнера с префиксом `[model-assets]`.
+
+Чтобы не скачивать веса заново после каждого запуска, подключите Docker volume:
+
+```powershell
+docker run --rm -p 8000:8000 `
+  -v kgo_model_cache:/app/.model_cache `
+  -e KGO_MODEL_REPO=likip3/AI-Models `
+  -e KGO_MODEL_RELEASE_TAG=v1 `
+  project-urfu-2026
+```
+
+Для отключения preload:
+
+```powershell
+docker run --rm -p 8000:8000 `
+  -e KGO_PRELOAD_MODEL_ASSETS=0 `
+  project-urfu-2026
+```
+
+## CI/CD
+
+Workflow `.github/workflows/ci.yml` выполняет:
+
+- unit tests через `pytest`;
+- проверку PEP8/runtime-кода через `ruff`;
+- сборку Docker image;
+- публикацию Docker image в Docker Hub при наличии repository secrets:
+  `DOCKERHUB_USERNAME` и `DOCKERHUB_TOKEN`.
+
+Имя публикуемого образа:
+
+```text
+DOCKERHUB_USERNAME/project-urfu-2026
+```
+
+## Подготовка датасета и обучение
+
+Скрипты подготовки датасета и обучения сохранены в `datasetCreation`, `NewClassificatorNoDino`, `SAM_model` и `SMP_model`.
+Они не требуются для запуска Web/API приложения, но оставлены в репозитории как исследовательская и training-часть проекта.

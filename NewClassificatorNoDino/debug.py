@@ -1,4 +1,3 @@
-import os
 import shutil
 from pathlib import Path
 from sklearn.metrics import classification_report, accuracy_score
@@ -101,8 +100,7 @@ def main():
         for path, true, pred in miss_classified[:50]:
             f.write(f"{path} | истина: {true} | предсказано: {pred}\n")
 
-    # Выводим результаты в консоль
-    print(f"Результаты сохранены в report.txt")
+    print("Результаты сохранены в report.txt")
     print(f"Точность (accuracy): {accuracy:.4f}")
     print(report)
 
