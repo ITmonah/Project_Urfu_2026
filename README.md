@@ -14,10 +14,20 @@ Web/API-приложение на FastAPI для запуска пайплайн
 python -m venv .venv
 .venv\Scripts\Activate.ps1
 pip install -r fastapi_app\requirements.txt
-uvicorn fastapi_app.main:app --reload
+python -m fastapi_app.run
 ```
 
 После запуска откройте `http://127.0.0.1:8000`.
+
+HTTPS включается, если передать приложению сертификат и ключ:
+
+```powershell
+$env:KGO_SSL_CERTFILE = "C:\certs\localhost.crt"
+$env:KGO_SSL_KEYFILE = "C:\certs\localhost.key"
+python -m fastapi_app.run
+```
+
+В этом режиме приложение слушает HTTPS на `https://127.0.0.1:8443`, а HTTP-запросы на `http://127.0.0.1:8000` перенаправляются на HTTPS с кодом `308`.
 
 API endpoint:
 
@@ -82,6 +92,25 @@ docker run --rm -p 8000:8000 `
 ```
 
 После запуска приложение доступно на `http://127.0.0.1:8000`.
+
+Запуск Docker с HTTPS и HTTP -> HTTPS redirect:
+
+```powershell
+docker run --rm -p 8000:8000 -p 8443:8443 `
+  -v C:\certs:/certs:ro `
+  -e KGO_SSL_CERTFILE=/certs/localhost.crt `
+  -e KGO_SSL_KEYFILE=/certs/localhost.key `
+  project-urfu-2026
+```
+
+Доступные переменные:
+
+- `KGO_SSL_CERTFILE` - путь к TLS-сертификату.
+- `KGO_SSL_KEYFILE` - путь к TLS-ключу.
+- `KGO_HTTPS_PORT` - HTTPS-порт, по умолчанию `8443`.
+- `KGO_HTTP_PORT` - HTTP-порт для редиректа, по умолчанию `8000`.
+- `KGO_HTTP_REDIRECT` - включает HTTP -> HTTPS redirect, по умолчанию `1` при наличии сертификата.
+- `KGO_FORCE_HTTPS` - включает redirect middleware для запуска за reverse proxy.
 
 В Docker image включена переменная:
 

@@ -1,8 +1,10 @@
 from io import BytesIO
 
+from fastapi import FastAPI
 from fastapi.testclient import TestClient
 from PIL import Image
 
+from fastapi_app.https import RedirectToHTTPSMiddleware
 from fastapi_app.main import app
 
 
@@ -55,3 +57,21 @@ def test_predict_returns_400_for_unknown_pipeline():
 
     assert response.status_code == 400
     assert "not configured" in response.json()["error"]
+
+
+def test_https_redirect_preserves_path_query_and_uses_https_port():
+    redirect_app = FastAPI()
+    redirect_app.add_middleware(RedirectToHTTPSMiddleware, https_port=8443)
+
+    @redirect_app.get("/api/pipelines")
+    async def pipelines():
+        return {"ok": True}
+
+    redirect_client = TestClient(redirect_app, follow_redirects=False)
+    response = redirect_client.get(
+        "/api/pipelines?mode=sam",
+        headers={"host": "example.test:8000"},
+    )
+
+    assert response.status_code == 308
+    assert response.headers["location"] == "https://example.test:8443/api/pipelines?mode=sam"

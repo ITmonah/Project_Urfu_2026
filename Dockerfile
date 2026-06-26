@@ -26,6 +26,6 @@ RUN pip install --no-cache-dir --upgrade pip \
 COPY . .
 RUN mkdir -p /app/.model_cache
 
-EXPOSE 8000
+EXPOSE 8000 8443
 
-CMD ["uvicorn", "fastapi_app.main:app", "--host", "0.0.0.0", "--port", "8000"]
+CMD ["python", "-m", "fastapi_app.run"]

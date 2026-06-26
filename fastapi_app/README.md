@@ -10,10 +10,20 @@
 
 ```powershell
 pip install -r fastapi_app\requirements.txt
-uvicorn fastapi_app.main:app --reload
+python -m fastapi_app.run
 ```
 
 После запуска откройте `http://127.0.0.1:8000`.
+
+Для HTTPS передайте сертификат и ключ:
+
+```powershell
+$env:KGO_SSL_CERTFILE = "C:\certs\localhost.crt"
+$env:KGO_SSL_KEYFILE = "C:\certs\localhost.key"
+python -m fastapi_app.run
+```
+
+С сертификатом приложение открывается на `https://127.0.0.1:8443`, а `http://127.0.0.1:8000` отвечает redirect на HTTPS с кодом `308`.
 
 ## Checkpoints
 
