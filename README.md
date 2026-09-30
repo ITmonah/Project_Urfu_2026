@@ -160,7 +160,7 @@ DOCKERHUB_USERNAME/project-urfu-2026
 Скрипты подготовки датасета и обучения сохранены в `datasetCreation`, `NewClassificatorNoDino`, `SAM_model` и `SMP_model`.
 Они не требуются для запуска Web/API приложения, но оставлены в репозитории как исследовательская и training-часть проекта.
 
-## Автоматизация разработки без Poetry
+## Автоматизация разработки
 
 Python: 3.11. Для локальных проверок используется стандартное окружение `venv`,
 `pip`, Ruff, pytest и pre-commit. В Git сохраняются конфигурация проверок
@@ -177,7 +177,7 @@ py -3.11 -m venv .venv
 .\.venv\Scripts\python.exe -m pytest -q
 ```
 
-Подробности: `docs/AUTOMATION_SETUP_NO_POETRY.md`.
+Подробности: `docs/AUTOMATION_SETUP.md`.
 Для полноценного запуска ML-приложения потребуются отдельные зависимости
 из `fastapi_app/requirements.txt`; специальные CUDA-зависимости
 из корневого `requirements.txt` не устанавливайте поверх тестового
