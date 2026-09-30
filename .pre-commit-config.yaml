@@ -1,0 +1,20 @@
+# Запускайте из venv, где установлен pre-commit из requirements-ci.txt.
+# Ruff ставится pre-commit отдельно, с зафиксированной версией.
+# Проверяется тот же runtime-набор файлов, что и в исходном CI.
+repos:
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v6.0.0
+    hooks:
+      - id: check-yaml
+      - id: check-toml
+      - id: check-merge-conflict
+
+  - repo: local
+    hooks:
+      - id: ruff-runtime
+        name: Ruff - существующий runtime-набор файлов
+        entry: ruff check --force-exclude --no-fix
+        language: python
+        additional_dependencies: [ruff==0.13.3]
+        types: [python]
+        files: '^(fastapi_app/.*\.py|pipeline/(classifier_models|pipeline)\.py|predict_image\.py|NewClassificatorNoDino/pipeline\.py|SAM_model/pipeline\.py|SMP_model/pipeline\.py|tests/.*\.py)$'
