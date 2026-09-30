@@ -1,6 +1,3 @@
-# Запускайте из venv, где установлен pre-commit из requirements-ci.txt.
-# Ruff ставится pre-commit отдельно, с зафиксированной версией.
-# Проверяется тот же runtime-набор файлов, что и в исходном CI.
 repos:
   - repo: https://github.com/pre-commit/pre-commit-hooks
     rev: v6.0.0
