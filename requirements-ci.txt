@@ -4,4 +4,5 @@ jinja2
 pillow
 pytest
 python-multipart
-ruff
+ruff==0.13.3
+pre-commit==4.3.0

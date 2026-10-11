@@ -274,40 +274,25 @@ DOCKERHUB_USERNAME/project-urfu-2026
 Скрипты подготовки датасета и обучения сохранены в `datasetCreation`, `NewClassificatorNoDino`, `SAM_model` и `SMP_model`.
 Они не требуются для запуска Web/API приложения, но оставлены в репозитории как исследовательская и training-часть проекта.
 
-Подготовка бинарного датасета кропов из ZIP-экспортов Datumaro и обучение классификаторов:
+## Автоматизация разработки
+
+Python: 3.11. Для локальных проверок используется стандартное окружение `venv`,
+`pip`, Ruff, pytest и pre-commit. В Git сохраняются конфигурация проверок
+и `requirements-ci.txt`, а не сама папка `.venv`.
+
+В Windows PowerShell из корня Git-репозитория:
 
 ```powershell
-python -m datasetCreation.prepare_datumaro_dataset --datasets-dir datasets
-python -m datasetCreation.train_classifiers --models efficientnet_v2_s convnext_tiny
+py -3.11 -m venv .venv
+.\.venv\Scripts\python.exe -m pip install --upgrade pip
+.\.venv\Scripts\python.exe -m pip install -r requirements-ci.txt
+.\.venv\Scripts\python.exe -m pre_commit install
+.\.venv\Scripts\python.exe -m pre_commit run --all-files
+.\.venv\Scripts\python.exe -m pytest -q
 ```
 
-Архивы должны содержать изображения, bounding boxes `kgo_platform` и метки состояния `kgo_empty` / `kgo_full`. Скрипт сохраняет кропы в `datasetCreation/cropped_datumaro`, обучение — веса и метрики в `artifacts/classification`. Это отдельный экспериментальный путь; он не обновляет веса приложения автоматически.
-
-Для трёхклассового классификатора полного фото:
-
-```powershell
-python NewClassificatorNoDino/prepareDataset.py --datasets-dir datasets --output-dir classification_data
-python NewClassificatorNoDino/train_classifier.py
-```
-
-`--output-dir classification_data` нужен, чтобы согласовать выход подготовки со входом обучения. Изображения без меток состояния скрипт относит к `kgo_none`; перед обучением нужно проверить, что они действительно не содержат площадку, а не просто недоразмечены. Результат обучения требуется проверить и явно подключить как checkpoint полного фото: имя выходного файла само по себе не устанавливает его роль.
-
-YOLO обучается в [yolo_finetune.ipynb](datasetCreation/yolo_finetune.ipynb); сегментаторы — в [SAM train_model.ipynb](SAM_model/train_model.ipynb) и [SMP train_model.ipynb](SMP_model/train_model.ipynb). Пути и преобразования данных в этих ноутбуках требуют настройки. Ограничения разбиения и соответствия рабочих весов описаны в [model cards](docs/model-cards.md).
-
-Оценка рабочих пайплайнов на подготовленной независимой выборке Datumaro:
-
-```powershell
-python scripts/evaluate_metrics.py --dataset datasets/42 `
-  --pipelines new_classifier_nodino sam smp --output reports/evaluation
-```
-
-Нужны `annotations/default.json` и `images/default/`, веса моделей и зависимости инференса; для графиков дополнительно `matplotlib`. Скрипт создаёт JSON-метрики, CSV-предсказания, сводную таблицу и графики. Фото без меток состояния пропускаются, поэтому отдельную оценку распознавания отсутствующей площадки нужно добавить. Ответы без метки и ошибки инференса учитываются как `no_zone`; они не должны исключаться из оценки итогового сервиса.
-
-Проверка API, загрузки весов и расчёта метрик без запуска тяжёлых моделей:
-
-```powershell
-pip install -r requirements-ci.txt
-pytest -q
-```
-
-Для воспроизводимого выпуска следует сохранять версию датасета, состав split, commit кода, гиперпараметры, версии библиотек, метрики и SHA-256 весов. Загруженные модели кэшируются в процессе, файлы весов — на диске: для новой версии используйте новый тег/каталог кэша и перезапуск приложения. Переключение одного только URL не обновит уже существующий файл кэша.
+Подробности: `docs/AUTOMATION_SETUP.md`.
+Для полноценного запуска ML-приложения потребуются отдельные зависимости
+из `fastapi_app/requirements.txt`; специальные CUDA-зависимости
+из корневого `requirements.txt` не устанавливайте поверх тестового
+окружения без проверки совместимости.
