@@ -1,0 +1,312 @@
+<?xml version='1.0' encoding='utf-8'?>
+<bpmn:definitions xmlns:bpmn="http://www.omg.org/spec/BPMN/20100524/MODEL" xmlns:bpmndi="http://www.omg.org/spec/BPMN/20100524/DI" xmlns:dc="http://www.omg.org/spec/DD/20100524/DC" xmlns:di="http://www.omg.org/spec/DD/20100524/DI" id="Definitions_model_use" targetNamespace="https://example.org/kgo/documentation" exporter="KGO documentation">
+  <bpmn:process id="Process_KGO" name="Использование модели: от фото до решения о вывозе" isExecutable="false">
+    <bpmn:documentation>Реализован ML-сервис; проверка ответственным и решение о вывозе — предлагаемые этапы.</bpmn:documentation>
+    <bpmn:laneSet id="LaneSet_KGO">
+      <bpmn:lane id="Lane_0" name="Сотрудник">
+        <bpmn:flowNodeRef>Start</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>Photo</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>Upload</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>Correct</bpmn:flowNodeRef>
+      </bpmn:lane>
+      <bpmn:lane id="Lane_1" name="ML-сервис">
+        <bpmn:flowNodeRef>Input</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>ErrorGate</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>Error</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>Detect</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>Zone</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>Score</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>Reply</bpmn:flowNodeRef>
+      </bpmn:lane>
+      <bpmn:lane id="Lane_2" name="Ответственный за вывоз">
+        <bpmn:flowNodeRef>Review</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>Clear</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>Manual</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>Decision</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>End</bpmn:flowNodeRef>
+      </bpmn:lane>
+    </bpmn:laneSet>
+    <bpmn:startEvent id="Start" name="Нужна оценка площадки">
+      <bpmn:outgoing>Flow_0</bpmn:outgoing>
+    </bpmn:startEvent>
+    <bpmn:userTask id="Photo" name="Сфотографировать площадку">
+      <bpmn:incoming>Flow_0</bpmn:incoming>
+      <bpmn:outgoing>Flow_1</bpmn:outgoing>
+    </bpmn:userTask>
+    <bpmn:userTask id="Upload" name="Выбрать режим и отправить фото">
+      <bpmn:incoming>Flow_1</bpmn:incoming>
+      <bpmn:outgoing>Flow_2</bpmn:outgoing>
+      <bpmn:incoming>Flow_6</bpmn:incoming>
+    </bpmn:userTask>
+    <bpmn:userTask id="Correct" name="Исправить запрос или заменить фото">
+      <bpmn:incoming>Flow_5</bpmn:incoming>
+      <bpmn:outgoing>Flow_6</bpmn:outgoing>
+    </bpmn:userTask>
+    <bpmn:serviceTask id="Input" name="Получить веса и декодировать фото">
+      <bpmn:incoming>Flow_2</bpmn:incoming>
+      <bpmn:outgoing>Flow_3</bpmn:outgoing>
+    </bpmn:serviceTask>
+    <bpmn:exclusiveGateway id="ErrorGate" name="Обработка выполнилась?">
+      <bpmn:incoming>Flow_3</bpmn:incoming>
+      <bpmn:outgoing>Flow_4</bpmn:outgoing>
+      <bpmn:outgoing>Flow_7</bpmn:outgoing>
+    </bpmn:exclusiveGateway>
+    <bpmn:serviceTask id="Error" name="Вернуть ошибку обработки">
+      <bpmn:incoming>Flow_4</bpmn:incoming>
+      <bpmn:outgoing>Flow_5</bpmn:outgoing>
+    </bpmn:serviceTask>
+    <bpmn:serviceTask id="Detect" name="YOLO: найти kgo_platform">
+      <bpmn:incoming>Flow_7</bpmn:incoming>
+      <bpmn:outgoing>Flow_8</bpmn:outgoing>
+    </bpmn:serviceTask>
+    <bpmn:exclusiveGateway id="Zone" name="Площадка найдена?">
+      <bpmn:incoming>Flow_8</bpmn:incoming>
+      <bpmn:outgoing>Flow_9</bpmn:outgoing>
+      <bpmn:outgoing>Flow_10</bpmn:outgoing>
+    </bpmn:exclusiveGateway>
+    <bpmn:subProcess id="Score" name="Оценить выбранным ML-пайплайном">
+      <bpmn:incoming>Flow_9</bpmn:incoming>
+      <bpmn:outgoing>Flow_11</bpmn:outgoing>
+    </bpmn:subProcess>
+    <bpmn:serviceTask id="Reply" name="Вернуть метку / отсутствие результата и визуализацию">
+      <bpmn:incoming>Flow_10</bpmn:incoming>
+      <bpmn:incoming>Flow_11</bpmn:incoming>
+      <bpmn:outgoing>Flow_12</bpmn:outgoing>
+    </bpmn:serviceTask>
+    <bpmn:userTask id="Review" name="Проверить ответ и исходное фото">
+      <bpmn:documentation>Предлагаемый этап; автоматизация в репозитории не реализована.</bpmn:documentation>
+      <bpmn:incoming>Flow_12</bpmn:incoming>
+      <bpmn:outgoing>Flow_13</bpmn:outgoing>
+    </bpmn:userTask>
+    <bpmn:exclusiveGateway id="Clear" name="Есть метка и фото понятно?">
+      <bpmn:documentation>Предлагаемый этап; автоматизация в репозитории не реализована.</bpmn:documentation>
+      <bpmn:incoming>Flow_13</bpmn:incoming>
+      <bpmn:outgoing>Flow_14</bpmn:outgoing>
+      <bpmn:outgoing>Flow_15</bpmn:outgoing>
+    </bpmn:exclusiveGateway>
+    <bpmn:userTask id="Manual" name="Оценить площадку вручную / уточнить">
+      <bpmn:documentation>Предлагаемый этап; автоматизация в репозитории не реализована.</bpmn:documentation>
+      <bpmn:incoming>Flow_14</bpmn:incoming>
+      <bpmn:outgoing>Flow_16</bpmn:outgoing>
+    </bpmn:userTask>
+    <bpmn:userTask id="Decision" name="Решить, нужен ли вывоз">
+      <bpmn:documentation>Предлагаемый этап; автоматизация в репозитории не реализована.</bpmn:documentation>
+      <bpmn:incoming>Flow_15</bpmn:incoming>
+      <bpmn:incoming>Flow_16</bpmn:incoming>
+      <bpmn:outgoing>Flow_17</bpmn:outgoing>
+    </bpmn:userTask>
+    <bpmn:endEvent id="End" name="Решение принято">
+      <bpmn:documentation>Предлагаемый этап; автоматизация в репозитории не реализована.</bpmn:documentation>
+      <bpmn:incoming>Flow_17</bpmn:incoming>
+    </bpmn:endEvent>
+    <bpmn:sequenceFlow id="Flow_0" sourceRef="Start" targetRef="Photo" name="" />
+    <bpmn:sequenceFlow id="Flow_1" sourceRef="Photo" targetRef="Upload" name="" />
+    <bpmn:sequenceFlow id="Flow_2" sourceRef="Upload" targetRef="Input" name="" />
+    <bpmn:sequenceFlow id="Flow_3" sourceRef="Input" targetRef="ErrorGate" name="" />
+    <bpmn:sequenceFlow id="Flow_4" sourceRef="ErrorGate" targetRef="Error" name="Нет">
+      <bpmn:conditionExpression>обработка не выполнена</bpmn:conditionExpression>
+    </bpmn:sequenceFlow>
+    <bpmn:sequenceFlow id="Flow_5" sourceRef="Error" targetRef="Correct" name="" />
+    <bpmn:sequenceFlow id="Flow_6" sourceRef="Correct" targetRef="Upload" name="" />
+    <bpmn:sequenceFlow id="Flow_7" sourceRef="ErrorGate" targetRef="Detect" name="Да">
+      <bpmn:conditionExpression>обработка выполнена</bpmn:conditionExpression>
+    </bpmn:sequenceFlow>
+    <bpmn:sequenceFlow id="Flow_8" sourceRef="Detect" targetRef="Zone" name="" />
+    <bpmn:sequenceFlow id="Flow_9" sourceRef="Zone" targetRef="Score" name="Да">
+      <bpmn:conditionExpression>найдена площадка</bpmn:conditionExpression>
+    </bpmn:sequenceFlow>
+    <bpmn:sequenceFlow id="Flow_10" sourceRef="Zone" targetRef="Reply" name="Нет">
+      <bpmn:conditionExpression>площадка не найдена</bpmn:conditionExpression>
+    </bpmn:sequenceFlow>
+    <bpmn:sequenceFlow id="Flow_11" sourceRef="Score" targetRef="Reply" name="" />
+    <bpmn:sequenceFlow id="Flow_12" sourceRef="Reply" targetRef="Review" name="" />
+    <bpmn:sequenceFlow id="Flow_13" sourceRef="Review" targetRef="Clear" name="" />
+    <bpmn:sequenceFlow id="Flow_14" sourceRef="Clear" targetRef="Manual" name="Нет">
+      <bpmn:conditionExpression>нет метки или фото неоднозначно</bpmn:conditionExpression>
+    </bpmn:sequenceFlow>
+    <bpmn:sequenceFlow id="Flow_15" sourceRef="Clear" targetRef="Decision" name="Да">
+      <bpmn:conditionExpression>есть метка и фото понятно</bpmn:conditionExpression>
+    </bpmn:sequenceFlow>
+    <bpmn:sequenceFlow id="Flow_16" sourceRef="Manual" targetRef="Decision" name="" />
+    <bpmn:sequenceFlow id="Flow_17" sourceRef="Decision" targetRef="End" name="" />
+  </bpmn:process>
+  <bpmn:collaboration id="Collaboration_KGO">
+    <bpmn:participant id="Participant_KGO" name="Процесс КГО" processRef="Process_KGO" />
+  </bpmn:collaboration>
+  <bpmndi:BPMNDiagram id="Diagram_KGO">
+    <bpmndi:BPMNPlane id="Plane_KGO" bpmnElement="Collaboration_KGO">
+      <bpmndi:BPMNShape id="Shape_Participant_KGO" bpmnElement="Participant_KGO" isHorizontal="true">
+        <dc:Bounds x="35" y="110" width="1630" height="780" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Shape_Lane_0" bpmnElement="Lane_0" isHorizontal="true">
+        <dc:Bounds x="67" y="110" width="1598" height="190" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Shape_Lane_1" bpmnElement="Lane_1" isHorizontal="true">
+        <dc:Bounds x="67" y="300" width="1598" height="360" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Shape_Lane_2" bpmnElement="Lane_2" isHorizontal="true">
+        <dc:Bounds x="67" y="660" width="1598" height="230" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Shape_Start" bpmnElement="Start">
+        <dc:Bounds x="205" y="178" width="38" height="38" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="139.0" y="226" width="170" height="42" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Shape_Photo" bpmnElement="Photo">
+        <dc:Bounds x="290" y="155" width="180" height="82" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Shape_Upload" bpmnElement="Upload">
+        <dc:Bounds x="525" y="155" width="180" height="82" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Shape_Correct" bpmnElement="Correct">
+        <dc:Bounds x="800" y="155" width="180" height="82" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Shape_Input" bpmnElement="Input">
+        <dc:Bounds x="525" y="360" width="180" height="82" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Shape_ErrorGate" bpmnElement="ErrorGate">
+        <dc:Bounds x="800" y="375" width="54" height="54" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="742" y="328" width="170" height="42" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Shape_Error" bpmnElement="Error">
+        <dc:Bounds x="930" y="360" width="180" height="82" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Shape_Detect" bpmnElement="Detect">
+        <dc:Bounds x="525" y="500" width="180" height="82" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Shape_Zone" bpmnElement="Zone">
+        <dc:Bounds x="800" y="515" width="54" height="54" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="742" y="470" width="170" height="42" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Shape_Score" bpmnElement="Score" isExpanded="false">
+        <dc:Bounds x="960" y="485" width="205" height="100" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Shape_Reply" bpmnElement="Reply">
+        <dc:Bounds x="1320" y="485" width="220" height="100" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Shape_Review" bpmnElement="Review">
+        <dc:Bounds x="1320" y="700" width="220" height="82" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Shape_Clear" bpmnElement="Clear">
+        <dc:Bounds x="1090" y="713" width="54" height="54" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="1032" y="674" width="170" height="42" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Shape_Manual" bpmnElement="Manual">
+        <dc:Bounds x="810" y="700" width="190" height="82" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Shape_Decision" bpmnElement="Decision">
+        <dc:Bounds x="525" y="700" width="190" height="82" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Shape_End" bpmnElement="End">
+        <dc:Bounds x="350" y="722" width="38" height="38" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="284.0" y="770" width="170" height="42" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNEdge id="Edge_Flow_0" bpmnElement="Flow_0">
+        <di:waypoint x="243" y="197" />
+        <di:waypoint x="290" y="197" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Edge_Flow_1" bpmnElement="Flow_1">
+        <di:waypoint x="470" y="197" />
+        <di:waypoint x="525" y="197" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Edge_Flow_2" bpmnElement="Flow_2">
+        <di:waypoint x="615" y="237" />
+        <di:waypoint x="615" y="360" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Edge_Flow_3" bpmnElement="Flow_3">
+        <di:waypoint x="705" y="402" />
+        <di:waypoint x="800" y="402" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Edge_Flow_4" bpmnElement="Flow_4">
+        <di:waypoint x="854" y="402" />
+        <di:waypoint x="930" y="402" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="854" y="376" width="80" height="24" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Edge_Flow_5" bpmnElement="Flow_5">
+        <di:waypoint x="1020" y="360" />
+        <di:waypoint x="1020" y="196" />
+        <di:waypoint x="980" y="196" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Edge_Flow_6" bpmnElement="Flow_6">
+        <di:waypoint x="800" y="196" />
+        <di:waypoint x="705" y="196" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Edge_Flow_7" bpmnElement="Flow_7">
+        <di:waypoint x="827" y="429" />
+        <di:waypoint x="827" y="469" />
+        <di:waypoint x="615" y="469" />
+        <di:waypoint x="615" y="500" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="719" y="443" width="80" height="24" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Edge_Flow_8" bpmnElement="Flow_8">
+        <di:waypoint x="705" y="542" />
+        <di:waypoint x="800" y="542" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Edge_Flow_9" bpmnElement="Flow_9">
+        <di:waypoint x="854" y="542" />
+        <di:waypoint x="960" y="542" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="858" y="514" width="80" height="24" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Edge_Flow_10" bpmnElement="Flow_10">
+        <di:waypoint x="827" y="569" />
+        <di:waypoint x="827" y="620" />
+        <di:waypoint x="1375" y="620" />
+        <di:waypoint x="1375" y="585" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="970" y="594" width="80" height="24" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Edge_Flow_11" bpmnElement="Flow_11">
+        <di:waypoint x="1165" y="535" />
+        <di:waypoint x="1320" y="535" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Edge_Flow_12" bpmnElement="Flow_12">
+        <di:waypoint x="1430" y="585" />
+        <di:waypoint x="1430" y="700" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Edge_Flow_13" bpmnElement="Flow_13">
+        <di:waypoint x="1320" y="740" />
+        <di:waypoint x="1144" y="740" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Edge_Flow_14" bpmnElement="Flow_14">
+        <di:waypoint x="1090" y="740" />
+        <di:waypoint x="1000" y="740" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="1004" y="714" width="80" height="24" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Edge_Flow_15" bpmnElement="Flow_15">
+        <di:waypoint x="1117" y="767" />
+        <di:waypoint x="1117" y="846" />
+        <di:waypoint x="620" y="846" />
+        <di:waypoint x="620" y="782" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="1040" y="819" width="80" height="24" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Edge_Flow_16" bpmnElement="Flow_16">
+        <di:waypoint x="810" y="741" />
+        <di:waypoint x="715" y="741" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Edge_Flow_17" bpmnElement="Flow_17">
+        <di:waypoint x="525" y="741" />
+        <di:waypoint x="388" y="741" />
+      </bpmndi:BPMNEdge>
+    </bpmndi:BPMNPlane>
+  </bpmndi:BPMNDiagram>
+</bpmn:definitions>

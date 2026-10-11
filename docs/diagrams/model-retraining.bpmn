@@ -1,0 +1,347 @@
+<?xml version='1.0' encoding='utf-8'?>
+<bpmn:definitions xmlns:bpmn="http://www.omg.org/spec/BPMN/20100524/MODEL" xmlns:bpmndi="http://www.omg.org/spec/BPMN/20100524/DI" xmlns:dc="http://www.omg.org/spec/DD/20100524/DC" xmlns:di="http://www.omg.org/spec/DD/20100524/DI" id="Definitions_model_retraining" targetNamespace="https://example.org/kgo/documentation" exporter="KGO documentation">
+  <bpmn:process id="Process_KGO" name="Переобучение: новые данные, контроль качества, выпуск" isExecutable="false">
+    <bpmn:documentation>Предлагаемый процесс. Пороги согласуются заранее; при отказе сохраняется или восстанавливается прежняя версия.</bpmn:documentation>
+    <bpmn:laneSet id="LaneSet_KGO">
+      <bpmn:lane id="Lane_0" name="ML / MLOps">
+        <bpmn:flowNodeRef>Schedule</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>Signal</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>Merge</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>Load</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>Prepare</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>Train</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>Evaluate</bpmn:flowNodeRef>
+      </bpmn:lane>
+      <bpmn:lane id="Lane_1" name="Эксперт / разметчик">
+        <bpmn:flowNodeRef>Label</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>Validate</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>Quality</bpmn:flowNodeRef>
+      </bpmn:lane>
+      <bpmn:lane id="Lane_2" name="Эксплуатация">
+        <bpmn:flowNodeRef>Register</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>Deploy</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>Smoke</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>Health</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>Rollback</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>Log</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>Monitor</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>End</bpmn:flowNodeRef>
+      </bpmn:lane>
+    </bpmn:laneSet>
+    <bpmn:startEvent id="Schedule" name="По расписанию">
+      <bpmn:documentation>Предлагаемый этап; автоматизация в репозитории не реализована.</bpmn:documentation>
+      <bpmn:outgoing>Flow_0</bpmn:outgoing>
+      <bpmn:timerEventDefinition id="EventDefinition_Schedule" />
+    </bpmn:startEvent>
+    <bpmn:startEvent id="Signal" name="Сигнал мониторинга">
+      <bpmn:documentation>Предлагаемый этап; автоматизация в репозитории не реализована.</bpmn:documentation>
+      <bpmn:outgoing>Flow_1</bpmn:outgoing>
+      <bpmn:conditionalEventDefinition id="EventDefinition_Signal">
+        <bpmn:condition>Наступило условие пересмотра модели по мониторингу качества</bpmn:condition>
+      </bpmn:conditionalEventDefinition>
+    </bpmn:startEvent>
+    <bpmn:exclusiveGateway id="Merge" name="">
+      <bpmn:documentation>Предлагаемый этап; автоматизация в репозитории не реализована.</bpmn:documentation>
+      <bpmn:incoming>Flow_0</bpmn:incoming>
+      <bpmn:incoming>Flow_1</bpmn:incoming>
+      <bpmn:outgoing>Flow_2</bpmn:outgoing>
+    </bpmn:exclusiveGateway>
+    <bpmn:serviceTask id="Load" name="Загрузить новые фото и обратную связь">
+      <bpmn:documentation>Предлагаемый этап; автоматизация в репозитории не реализована.</bpmn:documentation>
+      <bpmn:incoming>Flow_2</bpmn:incoming>
+      <bpmn:outgoing>Flow_3</bpmn:outgoing>
+    </bpmn:serviceTask>
+    <bpmn:serviceTask id="Prepare" name="Версионировать данные и разделить train / val / test">
+      <bpmn:documentation>Предлагаемый этап; автоматизация в репозитории не реализована.</bpmn:documentation>
+      <bpmn:incoming>Flow_4</bpmn:incoming>
+      <bpmn:outgoing>Flow_5</bpmn:outgoing>
+    </bpmn:serviceTask>
+    <bpmn:serviceTask id="Train" name="Обучить нужные компоненты">
+      <bpmn:documentation>Предлагаемый этап; автоматизация в репозитории не реализована.</bpmn:documentation>
+      <bpmn:incoming>Flow_5</bpmn:incoming>
+      <bpmn:outgoing>Flow_6</bpmn:outgoing>
+    </bpmn:serviceTask>
+    <bpmn:serviceTask id="Evaluate" name="Оценить кандидата и весь пайплайн">
+      <bpmn:documentation>Предлагаемый этап; автоматизация в репозитории не реализована.</bpmn:documentation>
+      <bpmn:incoming>Flow_6</bpmn:incoming>
+      <bpmn:outgoing>Flow_7</bpmn:outgoing>
+    </bpmn:serviceTask>
+    <bpmn:userTask id="Label" name="Проверить фото и разметить данные">
+      <bpmn:documentation>Предлагаемый этап; автоматизация в репозитории не реализована.</bpmn:documentation>
+      <bpmn:incoming>Flow_3</bpmn:incoming>
+      <bpmn:outgoing>Flow_4</bpmn:outgoing>
+    </bpmn:userTask>
+    <bpmn:userTask id="Validate" name="Проверить метрики, ошибки и срезы">
+      <bpmn:documentation>Предлагаемый этап; автоматизация в репозитории не реализована.</bpmn:documentation>
+      <bpmn:incoming>Flow_7</bpmn:incoming>
+      <bpmn:outgoing>Flow_8</bpmn:outgoing>
+    </bpmn:userTask>
+    <bpmn:exclusiveGateway id="Quality" name="Критерии качества выполнены?">
+      <bpmn:documentation>Предлагаемый этап; автоматизация в репозитории не реализована.</bpmn:documentation>
+      <bpmn:incoming>Flow_8</bpmn:incoming>
+      <bpmn:outgoing>Flow_9</bpmn:outgoing>
+      <bpmn:outgoing>Flow_10</bpmn:outgoing>
+    </bpmn:exclusiveGateway>
+    <bpmn:serviceTask id="Register" name="Выпустить веса и обновить model card">
+      <bpmn:documentation>Предлагаемый этап; автоматизация в репозитории не реализована.</bpmn:documentation>
+      <bpmn:incoming>Flow_9</bpmn:incoming>
+      <bpmn:outgoing>Flow_11</bpmn:outgoing>
+    </bpmn:serviceTask>
+    <bpmn:serviceTask id="Deploy" name="Подключить версию и перезапустить сервис">
+      <bpmn:documentation>Предлагаемый этап; автоматизация в репозитории не реализована.</bpmn:documentation>
+      <bpmn:incoming>Flow_11</bpmn:incoming>
+      <bpmn:outgoing>Flow_12</bpmn:outgoing>
+    </bpmn:serviceTask>
+    <bpmn:serviceTask id="Smoke" name="Проверить сервис после выпуска">
+      <bpmn:documentation>Предлагаемый этап; автоматизация в репозитории не реализована.</bpmn:documentation>
+      <bpmn:incoming>Flow_12</bpmn:incoming>
+      <bpmn:outgoing>Flow_13</bpmn:outgoing>
+    </bpmn:serviceTask>
+    <bpmn:exclusiveGateway id="Health" name="Проверка успешна?">
+      <bpmn:documentation>Предлагаемый этап; автоматизация в репозитории не реализована.</bpmn:documentation>
+      <bpmn:incoming>Flow_13</bpmn:incoming>
+      <bpmn:outgoing>Flow_14</bpmn:outgoing>
+      <bpmn:outgoing>Flow_16</bpmn:outgoing>
+    </bpmn:exclusiveGateway>
+    <bpmn:serviceTask id="Rollback" name="Откатить на прежнюю версию">
+      <bpmn:documentation>Предлагаемый этап; автоматизация в репозитории не реализована.</bpmn:documentation>
+      <bpmn:incoming>Flow_14</bpmn:incoming>
+      <bpmn:outgoing>Flow_15</bpmn:outgoing>
+    </bpmn:serviceTask>
+    <bpmn:serviceTask id="Log" name="Сохранить причину, уведомить ML-команду">
+      <bpmn:documentation>Предлагаемый этап; автоматизация в репозитории не реализована.</bpmn:documentation>
+      <bpmn:incoming>Flow_10</bpmn:incoming>
+      <bpmn:incoming>Flow_15</bpmn:incoming>
+      <bpmn:outgoing>Flow_17</bpmn:outgoing>
+    </bpmn:serviceTask>
+    <bpmn:serviceTask id="Monitor" name="Продолжить мониторинг действующей версии">
+      <bpmn:documentation>Предлагаемый этап; автоматизация в репозитории не реализована.</bpmn:documentation>
+      <bpmn:incoming>Flow_16</bpmn:incoming>
+      <bpmn:incoming>Flow_17</bpmn:incoming>
+      <bpmn:outgoing>Flow_18</bpmn:outgoing>
+    </bpmn:serviceTask>
+    <bpmn:endEvent id="End" name="Цикл завершён">
+      <bpmn:documentation>Предлагаемый этап; автоматизация в репозитории не реализована.</bpmn:documentation>
+      <bpmn:incoming>Flow_18</bpmn:incoming>
+    </bpmn:endEvent>
+    <bpmn:sequenceFlow id="Flow_0" sourceRef="Schedule" targetRef="Merge" name="" />
+    <bpmn:sequenceFlow id="Flow_1" sourceRef="Signal" targetRef="Merge" name="" />
+    <bpmn:sequenceFlow id="Flow_2" sourceRef="Merge" targetRef="Load" name="" />
+    <bpmn:sequenceFlow id="Flow_3" sourceRef="Load" targetRef="Label" name="" />
+    <bpmn:sequenceFlow id="Flow_4" sourceRef="Label" targetRef="Prepare" name="" />
+    <bpmn:sequenceFlow id="Flow_5" sourceRef="Prepare" targetRef="Train" name="" />
+    <bpmn:sequenceFlow id="Flow_6" sourceRef="Train" targetRef="Evaluate" name="" />
+    <bpmn:sequenceFlow id="Flow_7" sourceRef="Evaluate" targetRef="Validate" name="" />
+    <bpmn:sequenceFlow id="Flow_8" sourceRef="Validate" targetRef="Quality" name="" />
+    <bpmn:sequenceFlow id="Flow_9" sourceRef="Quality" targetRef="Register" name="Да">
+      <bpmn:conditionExpression>критерии качества выполнены</bpmn:conditionExpression>
+    </bpmn:sequenceFlow>
+    <bpmn:sequenceFlow id="Flow_10" sourceRef="Quality" targetRef="Log" name="Нет">
+      <bpmn:conditionExpression>критерии качества не выполнены</bpmn:conditionExpression>
+    </bpmn:sequenceFlow>
+    <bpmn:sequenceFlow id="Flow_11" sourceRef="Register" targetRef="Deploy" name="" />
+    <bpmn:sequenceFlow id="Flow_12" sourceRef="Deploy" targetRef="Smoke" name="" />
+    <bpmn:sequenceFlow id="Flow_13" sourceRef="Smoke" targetRef="Health" name="" />
+    <bpmn:sequenceFlow id="Flow_14" sourceRef="Health" targetRef="Rollback" name="Нет">
+      <bpmn:conditionExpression>проверка сервиса не пройдена</bpmn:conditionExpression>
+    </bpmn:sequenceFlow>
+    <bpmn:sequenceFlow id="Flow_15" sourceRef="Rollback" targetRef="Log" name="" />
+    <bpmn:sequenceFlow id="Flow_16" sourceRef="Health" targetRef="Monitor" name="Да">
+      <bpmn:conditionExpression>проверка сервиса пройдена</bpmn:conditionExpression>
+    </bpmn:sequenceFlow>
+    <bpmn:sequenceFlow id="Flow_17" sourceRef="Log" targetRef="Monitor" name="" />
+    <bpmn:sequenceFlow id="Flow_18" sourceRef="Monitor" targetRef="End" name="" />
+  </bpmn:process>
+  <bpmn:collaboration id="Collaboration_KGO">
+    <bpmn:participant id="Participant_KGO" name="Процесс КГО" processRef="Process_KGO" />
+  </bpmn:collaboration>
+  <bpmndi:BPMNDiagram id="Diagram_KGO">
+    <bpmndi:BPMNPlane id="Plane_KGO" bpmnElement="Collaboration_KGO">
+      <bpmndi:BPMNShape id="Shape_Participant_KGO" bpmnElement="Participant_KGO" isHorizontal="true">
+        <dc:Bounds x="35" y="110" width="1630" height="805" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Shape_Lane_0" bpmnElement="Lane_0" isHorizontal="true">
+        <dc:Bounds x="67" y="110" width="1598" height="240" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Shape_Lane_1" bpmnElement="Lane_1" isHorizontal="true">
+        <dc:Bounds x="67" y="350" width="1598" height="200" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Shape_Lane_2" bpmnElement="Lane_2" isHorizontal="true">
+        <dc:Bounds x="67" y="550" width="1598" height="365" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Shape_Schedule" bpmnElement="Schedule">
+        <dc:Bounds x="230" y="160" width="38" height="38" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="164.0" y="208" width="170" height="42" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Shape_Signal" bpmnElement="Signal">
+        <dc:Bounds x="230" y="260" width="38" height="38" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="164.0" y="308" width="170" height="42" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Shape_Merge" bpmnElement="Merge">
+        <dc:Bounds x="300" y="220" width="54" height="54" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Shape_Load" bpmnElement="Load">
+        <dc:Bounds x="405" y="205" width="205" height="82" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Shape_Prepare" bpmnElement="Prepare">
+        <dc:Bounds x="830" y="205" width="205" height="90" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Shape_Train" bpmnElement="Train">
+        <dc:Bounds x="1090" y="205" width="190" height="90" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Shape_Evaluate" bpmnElement="Evaluate">
+        <dc:Bounds x="1350" y="205" width="190" height="90" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Shape_Label" bpmnElement="Label">
+        <dc:Bounds x="405" y="420" width="205" height="82" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Shape_Validate" bpmnElement="Validate">
+        <dc:Bounds x="1350" y="420" width="190" height="82" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Shape_Quality" bpmnElement="Quality">
+        <dc:Bounds x="1130" y="432" width="54" height="54" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="1072" y="387" width="170" height="42" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Shape_Register" bpmnElement="Register">
+        <dc:Bounds x="1100" y="610" width="215" height="82" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Shape_Deploy" bpmnElement="Deploy">
+        <dc:Bounds x="1370" y="610" width="215" height="82" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Shape_Smoke" bpmnElement="Smoke">
+        <dc:Bounds x="1370" y="760" width="215" height="82" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Shape_Health" bpmnElement="Health">
+        <dc:Bounds x="1140" y="774" width="54" height="54" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="1082" y="730" width="170" height="42" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Shape_Rollback" bpmnElement="Rollback">
+        <dc:Bounds x="850" y="760" width="205" height="82" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Shape_Log" bpmnElement="Log">
+        <dc:Bounds x="570" y="610" width="215" height="82" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Shape_Monitor" bpmnElement="Monitor">
+        <dc:Bounds x="300" y="760" width="215" height="82" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Shape_End" bpmnElement="End">
+        <dc:Bounds x="227" y="781" width="38" height="38" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="161.0" y="829" width="170" height="42" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNEdge id="Edge_Flow_0" bpmnElement="Flow_0">
+        <di:waypoint x="268" y="179" />
+        <di:waypoint x="285" y="179" />
+        <di:waypoint x="285" y="247" />
+        <di:waypoint x="300" y="247" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Edge_Flow_1" bpmnElement="Flow_1">
+        <di:waypoint x="268" y="279" />
+        <di:waypoint x="285" y="279" />
+        <di:waypoint x="285" y="247" />
+        <di:waypoint x="300" y="247" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Edge_Flow_2" bpmnElement="Flow_2">
+        <di:waypoint x="354" y="247" />
+        <di:waypoint x="405" y="247" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Edge_Flow_3" bpmnElement="Flow_3">
+        <di:waypoint x="507" y="287" />
+        <di:waypoint x="507" y="420" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Edge_Flow_4" bpmnElement="Flow_4">
+        <di:waypoint x="610" y="461" />
+        <di:waypoint x="740" y="461" />
+        <di:waypoint x="740" y="250" />
+        <di:waypoint x="830" y="250" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Edge_Flow_5" bpmnElement="Flow_5">
+        <di:waypoint x="1035" y="250" />
+        <di:waypoint x="1090" y="250" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Edge_Flow_6" bpmnElement="Flow_6">
+        <di:waypoint x="1280" y="250" />
+        <di:waypoint x="1350" y="250" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Edge_Flow_7" bpmnElement="Flow_7">
+        <di:waypoint x="1445" y="295" />
+        <di:waypoint x="1445" y="420" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Edge_Flow_8" bpmnElement="Flow_8">
+        <di:waypoint x="1350" y="461" />
+        <di:waypoint x="1184" y="461" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Edge_Flow_9" bpmnElement="Flow_9">
+        <di:waypoint x="1157" y="486" />
+        <di:waypoint x="1157" y="558" />
+        <di:waypoint x="1207" y="558" />
+        <di:waypoint x="1207" y="610" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="1195" y="534" width="80" height="24" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Edge_Flow_10" bpmnElement="Flow_10">
+        <di:waypoint x="1130" y="459" />
+        <di:waypoint x="1080" y="459" />
+        <di:waypoint x="1080" y="520" />
+        <di:waypoint x="677" y="520" />
+        <di:waypoint x="677" y="610" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="937" y="494" width="80" height="24" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Edge_Flow_11" bpmnElement="Flow_11">
+        <di:waypoint x="1315" y="651" />
+        <di:waypoint x="1370" y="651" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Edge_Flow_12" bpmnElement="Flow_12">
+        <di:waypoint x="1477" y="692" />
+        <di:waypoint x="1477" y="760" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Edge_Flow_13" bpmnElement="Flow_13">
+        <di:waypoint x="1370" y="801" />
+        <di:waypoint x="1194" y="801" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Edge_Flow_14" bpmnElement="Flow_14">
+        <di:waypoint x="1140" y="801" />
+        <di:waypoint x="1055" y="801" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="1058" y="775" width="80" height="24" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Edge_Flow_15" bpmnElement="Flow_15">
+        <di:waypoint x="952" y="760" />
+        <di:waypoint x="952" y="720" />
+        <di:waypoint x="677" y="720" />
+        <di:waypoint x="677" y="692" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Edge_Flow_16" bpmnElement="Flow_16">
+        <di:waypoint x="1167" y="828" />
+        <di:waypoint x="1167" y="885" />
+        <di:waypoint x="407" y="885" />
+        <di:waypoint x="407" y="842" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="1060" y="858" width="80" height="24" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Edge_Flow_17" bpmnElement="Flow_17">
+        <di:waypoint x="570" y="651" />
+        <di:waypoint x="407" y="651" />
+        <di:waypoint x="407" y="760" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Edge_Flow_18" bpmnElement="Flow_18">
+        <di:waypoint x="300" y="801" />
+        <di:waypoint x="265" y="801" />
+      </bpmndi:BPMNEdge>
+    </bpmndi:BPMNPlane>
+  </bpmndi:BPMNDiagram>
+</bpmn:definitions>
